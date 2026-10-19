@@ -45,25 +45,39 @@ class DispatchDashboard extends StatefulWidget {
 }
 
 class _DispatchDashboardState extends State<DispatchDashboard> {
-  final DatabaseReference _dbRef = FirebaseDatabase.instance.ref("units");
+  // On écoute la racine pour s'assurer de récupérer les données peu importe le nœud
+  final DatabaseReference _dbRef = FirebaseDatabase.instance.ref();
   Map<String, dynamic> _units = {};
   bool _hasSosAlert = false;
   bool _isLoading = true;
+  String _debugInfo = "Connexion à Firebase en cours...";
 
   @override
   void initState() {
     super.initState();
-    _listenToUnits();
+    _listenToDatabase();
   }
 
-  void _listenToUnits() {
+  void _listenToDatabase() {
     _dbRef.onValue.listen((event) {
-      final data = event.snapshot.value as Map<dynamic, dynamic>?;
-      if (data != null) {
+      final rawData = event.snapshot.value;
+      setState(() {
+        _debugInfo = "Données brutes reçues : ${rawData != null ? 'Oui' : 'Vide'}";
+      });
+
+      if (rawData != null && rawData is Map) {
+        // Recherche des unités (soit dans un nœud 'units', soit directement à la racine)
+        Map<dynamic, dynamic>? unitsMap;
+        if (rawData.containsKey('units') && rawData['units'] is Map) {
+          unitsMap = rawData['units'] as Map<dynamic, dynamic>;
+        } else {
+          unitsMap = rawData;
+        }
+
         Map<String, dynamic> parsedUnits = {};
         bool sosDetected = false;
 
-        data.forEach((key, value) {
+        unitsMap.forEach((key, value) {
           if (value != null && value is Map) {
             final unitMap = Map<String, dynamic>.from(value);
             parsedUnits[key.toString()] = unitMap;
@@ -88,6 +102,7 @@ class _DispatchDashboardState extends State<DispatchDashboard> {
     }, onError: (error) {
       setState(() {
         _isLoading = false;
+        _debugInfo = "Erreur Firebase : $error";
       });
     });
   }
@@ -123,7 +138,8 @@ class _DispatchDashboardState extends State<DispatchDashboard> {
             style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
             onPressed: () {
               if (titleController.text.isNotEmpty && locationController.text.isNotEmpty) {
-                _dbRef.child("$unitId/active_mission").set({
+                // Compatible avec les deux structures de base de données
+                _dbRef.child("units/$unitId/active_mission").set({
                   "title": titleController.text.trim(),
                   "location": locationController.text.trim(),
                   "timestamp": ServerValue.timestamp,
@@ -139,7 +155,7 @@ class _DispatchDashboardState extends State<DispatchDashboard> {
   }
 
   void _clearMission(String unitId) {
-    _dbRef.child("$unitId/active_mission").remove();
+    _dbRef.child("units/$unitId/active_mission").remove();
   }
 
   Color _getStatusColor(String? status) {
@@ -161,7 +177,7 @@ class _DispatchDashboardState extends State<DispatchDashboard> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('REZO+ // CSU Commandement'),
+        title: Text('REZO+ // CSU Commandement — [Status: ${_units.length} unité(s)]'),
         backgroundColor: _hasSosAlert ? Colors.red.shade900 : const Color(0xFF1a1a2e),
       ),
       body: Padding(
@@ -169,14 +185,19 @@ class _DispatchDashboardState extends State<DispatchDashboard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Barre de debug temporaire pour voir l'état de la liaison
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(4)),
+              child: Text('Debug: $_debugInfo', style: const TextStyle(fontSize: 12, color: Colors.amber)),
+            ),
+
             if (_hasSosAlert)
               Container(
                 margin: const EdgeInsets.only(bottom: 16),
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.red,
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(8)),
                 child: const Row(
                   children: [
                     Icon(Icons.warning_amber_rounded, size: 36, color: Colors.white),
@@ -201,11 +222,11 @@ class _DispatchDashboardState extends State<DispatchDashboard> {
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _units.isEmpty
-                      ? const Center(
+                      ? Center(
                           child: Text(
-                            'Aucun équipage connecté pour le moment.\n\nAssurez-vous que l\'application Android est ouverte et qu\'un équipage a démarré sa prise de service.',
+                            'Aucune unité détectée dans Firebase.\n\n$_debugInfo',
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.grey, fontSize: 16),
+                            style: const TextStyle(color: Colors.grey, fontSize: 15),
                           ),
                         )
                       : GridView.builder(
@@ -218,7 +239,10 @@ class _DispatchDashboardState extends State<DispatchDashboard> {
                           itemCount: _units.length,
                           itemBuilder: (context, index) {
                             String unitId = _units.keys.elementAt(index);
-                            Map<String, dynamic> data = _units[unitId];
+                            // Eviter d'afficher des métadonnées système si présentes à la racine
+                            if (unitId == 'units') return const SizedBox.shrink();
+                            
+                            Map<String, dynamic> data = Map<String, dynamic>.from(_units[unitId] ?? {});
                             String status = data['status'] ?? 'INCONNU';
                             Map<dynamic, dynamic>? mission = data['active_mission'];
                             dynamic lat = data['latitude'];
