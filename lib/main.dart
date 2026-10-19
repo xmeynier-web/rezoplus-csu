@@ -57,10 +57,8 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
   List<Map<String, dynamic>> _mainCouranteEntries = [];
   
   bool _hasSosAlert = false;
-  Timer? _sosSoundTimer;
-
   late TabController _tabController;
-  final LatLng _defaultCenter = const LatLng(48.7538, 2.3218); // Fresnes / Val-de-Marne
+  final LatLng _defaultCenter = const LatLng(48.7538, 2.3218); // Fresnes
   String _archiveSearchQuery = "";
 
   @override
@@ -73,20 +71,8 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
 
   @override
   void dispose() {
-    _sosSoundTimer?.cancel();
     _tabController.dispose();
     super.dispose();
-  }
-
-  void _triggerSosAlarmLoop(bool active) {
-    if (active) {
-      if (_sosSoundTimer == null || !_sosSoundTimer!.isActive) {
-        _sosSoundTimer = Timer.periodic(const Duration(seconds: 1), (timer) {});
-      }
-    } else {
-      _sosSoundTimer?.cancel();
-      _sosSoundTimer = null;
-    }
   }
 
   void _listenToDatabase() {
@@ -121,22 +107,11 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
           }
         });
 
-        if (sosDetected && !_hasSosAlert) {
-          _addMainCouranteEntry(
-            unitId: "ALERTE",
-            action: "🚨 DÉCLENCHEMENT SOS",
-            details: "Une unité a déclenché l'alerte d'urgence !",
-          );
-        }
-
-        _triggerSosAlarmLoop(sosDetected);
-
         setState(() {
           _units = parsedUnits;
           _hasSosAlert = sosDetected;
         });
       } else {
-        _triggerSosAlarmLoop(false);
         setState(() {
           _units = {};
           _hasSosAlert = false;
@@ -261,33 +236,26 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
             point: LatLng(lat, lng),
             width: 80,
             height: 80,
-            child: GestureDetector(
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Équipage : $unitId ($status)')),
-                );
-              },
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.black87,
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: _getStatusColor(status)),
-                    ),
-                    child: Text(
-                      unitId,
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
-                    ),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.black87,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: _getStatusColor(status)),
                   ),
-                  Icon(
-                    Icons.local_police,
-                    color: _getStatusColor(status),
-                    size: 32,
+                  child: Text(
+                    unitId,
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
-                ],
-              ),
+                ),
+                Icon(
+                  Icons.local_police,
+                  color: _getStatusColor(status),
+                  size: 32,
+                ),
+              ],
             ),
           ),
         );
@@ -296,7 +264,7 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('REZO+ // CSU Commandement [Unités : ${_units.length}]'),
+        title: Text('REZO+ // CSU Commandement [Unités en direct : ${_units.length}]'),
         backgroundColor: _hasSosAlert ? Colors.red.shade900 : const Color(0xFF1a1a2e),
         bottom: TabBar(
           controller: _tabController,
@@ -321,6 +289,7 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
                     initialZoom: 13.5,
                   ),
                   children: [
+                    // Tuiles OpenStreetMap officielles (Sans clé d'API requise)
                     TileLayer(
                       urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                       userAgentPackageName: 'com.rezoplus.csu',
@@ -330,7 +299,7 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
                 ),
               ),
               Container(
-                width: 420,
+                width: 400,
                 color: const Color(0xFF12121a),
                 padding: const EdgeInsets.all(12),
                 child: Column(
@@ -354,11 +323,11 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
                           ],
                         ),
                       ),
-                    const Text('Équipages en service :', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const Text('Équipages en service (Firebase) :', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     Expanded(
                       child: _units.isEmpty
-                          ? const Center(child: Text('Aucune unité connectée.', style: TextStyle(color: Colors.grey)))
+                          ? const Center(child: Text('Aucune unité connectée sur Firebase.', style: TextStyle(color: Colors.grey)))
                           : ListView.builder(
                               itemCount: _units.length,
                               itemBuilder: (context, index) {
@@ -404,12 +373,12 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
                                             label: const Text('Centrer sur la carte', style: TextStyle(fontSize: 11, color: Colors.blueAccent)),
                                           ),
                                         
-                                        // --- SECTION MATÉRIEL EMBARQUÉ SÉCURISÉE ---
-                                        const SizedBox(height: 6),
+                                        // --- LECTURE DU MATÉRIEL EMBARQUÉ ---
+                                        const SizedBox(height: 8),
                                         const Text('Matériel embarqué :', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white70)),
                                         const SizedBox(height: 4),
                                         rawEquipment == null
-                                            ? const Text('Aucun équipement déclaré', style: TextStyle(fontSize: 10, color: Colors.grey))
+                                            ? const Text('Aucun matériel transmis', style: TextStyle(fontSize: 10, color: Colors.grey))
                                             : Wrap(
                                                 spacing: 4,
                                                 runSpacing: 4,
@@ -433,9 +402,8 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
                                                           ),
                                                         );
                                                       }).toList()
-                                                    : [const Text('Format non reconnu', style: TextStyle(fontSize: 10, color: Colors.red))],
+                                                    : [const Text('Données matériel invalides', style: TextStyle(fontSize: 10, color: Colors.red))],
                                               ),
-                                        // ---------------------------------------------
 
                                         if (mission != null)
                                           Container(
@@ -487,25 +455,19 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        decoration: const InputDecoration(
-                          hintText: 'Rechercher dans les archives (Unité, Mission, SOS...)',
-                          prefixIcon: Icon(Icons.search),
-                          border: OutlineInputBorder(),
-                          filled: true,
-                          fillColor: Color(0xFF1e1e2d),
-                        ),
-                        onChanged: (val) {
-                          setState(() {
-                            _archiveSearchQuery = val.toLowerCase();
-                          });
-                        },
-                      ),
-                    ),
-                  ],
+                TextField(
+                  decoration: const InputDecoration(
+                    hintText: 'Rechercher dans la Main Courante...',
+                    prefixIcon: Icon(Icons.search),
+                    border: OutlineInputBorder(),
+                    filled: true,
+                    fillColor: Color(0xFF1e1e2d),
+                  ),
+                  onChanged: (val) {
+                    setState(() {
+                      _archiveSearchQuery = val.toLowerCase();
+                    });
+                  },
                 ),
                 const SizedBox(height: 16),
                 const Text('Registre Historique des Interventions :', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
