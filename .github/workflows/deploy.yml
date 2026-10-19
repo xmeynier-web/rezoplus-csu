@@ -19,7 +19,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Java
@@ -33,14 +33,15 @@ jobs:
         with:
           flutter-version: '3.19.6'
           channel: 'stable'
+          cache: true
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: flutter pub get
 
-      - name: Build Web
+      - name: Build Web release
         run: flutter build web --release --base-href "/rezoplus-csu/"
 
-      - name: Upload Artifact
+      - name: Upload artifact for GitHub Pages
         uses: actions/upload-pages-artifact@v3
         with:
           path: build/web
