@@ -60,7 +60,7 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
   Timer? _sosSoundTimer;
 
   late TabController _tabController;
-  final LatLng _defaultCenter = const LatLng(48.7538, 2.3218); // Fresnes / Val-de-Marne
+  final LatLng _defaultCenter = const LatLng(48.7538, 2.3218); // Fresnes
   String _archiveSearchQuery = "";
 
   @override
@@ -78,12 +78,11 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
     super.dispose();
   }
 
-  // --- GESTION DES ALERTES VISUELLES & LOGIQUE ---
   void _triggerSosAlarmLoop(bool active) {
     if (active) {
       if (_sosSoundTimer == null || !_sosSoundTimer!.isActive) {
         _sosSoundTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-          // Actualisation visuelle d'alerte active
+          // Logique d'alerte SOS active
         });
       }
     } else {
@@ -92,7 +91,6 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
     }
   }
 
-  // --- BINDING FIREBASE ---
   void _listenToDatabase() {
     _dbRef.child("units").onValue.listen((event) {
       final rawData = event.snapshot.value;
