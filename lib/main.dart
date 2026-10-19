@@ -25,7 +25,7 @@ class RezoPlusDispatchApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Rezo+ CSU - Poste de Commandement',
+      title: 'Rezo+ CSU - Commandement',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         primaryColor: Colors.blueAccent,
@@ -48,6 +48,7 @@ class _DispatchDashboardState extends State<DispatchDashboard> {
   final DatabaseReference _dbRef = FirebaseDatabase.instance.ref("units");
   Map<String, dynamic> _units = {};
   bool _hasSosAlert = false;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -63,23 +64,31 @@ class _DispatchDashboardState extends State<DispatchDashboard> {
         bool sosDetected = false;
 
         data.forEach((key, value) {
-          final unitMap = Map<String, dynamic>.from(value as Map);
-          parsedUnits[key.toString()] = unitMap;
-          if (unitMap['status'] == 'SOS_ACTIF') {
-            sosDetected = true;
+          if (value != null && value is Map) {
+            final unitMap = Map<String, dynamic>.from(value);
+            parsedUnits[key.toString()] = unitMap;
+            if (unitMap['status'] == 'SOS_ACTIF') {
+              sosDetected = true;
+            }
           }
         });
 
         setState(() {
           _units = parsedUnits;
           _hasSosAlert = sosDetected;
+          _isLoading = false;
         });
       } else {
         setState(() {
           _units = {};
           _hasSosAlert = false;
+          _isLoading = false;
         });
       }
+    }, onError: (error) {
+      setState(() {
+        _isLoading = false;
+      });
     });
   }
 
@@ -90,13 +99,13 @@ class _DispatchDashboardState extends State<DispatchDashboard> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Transmettre un ordre de mission à : $unitId'),
+        title: Text('Transmettre une mission : $unitId'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: titleController,
-              decoration: const InputDecoration(labelText: 'Objet de la mission / Intervention'),
+              decoration: const InputDecoration(labelText: 'Objet de la mission'),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -120,9 +129,6 @@ class _DispatchDashboardState extends State<DispatchDashboard> {
                   "timestamp": ServerValue.timestamp,
                 });
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Ordre de mission transmis avec succès !')),
-                );
               }
             },
             child: const Text('Envoyer'),
@@ -155,13 +161,7 @@ class _DispatchDashboardState extends State<DispatchDashboard> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Row(
-          children: [
-            Icon(Icons.local_police, color: Colors.blueAccent),
-            SizedBox(width: 12),
-            Text('REZO+ // Centre de Supervision Urbain (CSU) - Commandement'),
-          ],
-        ),
+        title: const Text('REZO+ // CSU Commandement'),
         backgroundColor: _hasSosAlert ? Colors.red.shade900 : const Color(0xFF1a1a2e),
       ),
       body: Padding(
@@ -181,121 +181,124 @@ class _DispatchDashboardState extends State<DispatchDashboard> {
                   children: [
                     Icon(Icons.warning_amber_rounded, size: 36, color: Colors.white),
                     SizedBox(width: 16),
-                    Text(
-                      'ALERTE ROUGE : UN OU PLUSIEURS ÉQUIPAGES ONT DÉCLENCHÉ UN SOS SUR LE TERRAIN !',
-                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                    Expanded(
+                      child: Text(
+                        '🚨 ALERTE SOS DÉCLENCHÉE SUR LE TERRAIN !',
+                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ],
                 ),
               ),
 
             const Text(
-              'Équipages en service et suivis en temps réel :',
+              'Équipages connectés en temps réel :',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
 
             Expanded(
-              child: _units.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'Aucun équipage connecté pour le moment.\nLes unités apparaîtront ici dès leur prise de service.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey, fontSize: 16),
-                      ),
-                    )
-                  : GridView.builder(
-                      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                        maxCrossAxisExtent: 400,
-                        mainAxisExtent: 320,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                      ),
-                      itemCount: _units.length,
-                      itemBuilder: (context, index) {
-                        String unitId = _units.keys.elementAt(index);
-                        Map<String, dynamic> data = _units[unitId];
-                        String status = data['status'] ?? 'INCONNU';
-                        Map<dynamic, dynamic>? mission = data['active_mission'];
-                        double? lat = data['latitude'];
-                        double? lng = data['longitude'];
-
-                        return Card(
-                          elevation: 4,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            side: BorderSide(color: _getStatusColor(status), width: 2),
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _units.isEmpty
+                      ? const Center(
+                          child: Text(
+                            'Aucun équipage connecté pour le moment.\n\nAssurez-vous que l\'application Android est ouverte et qu\'un équipage a démarré sa prise de service.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.grey, fontSize: 16),
                           ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        )
+                      : GridView.builder(
+                          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: 400,
+                            mainAxisExtent: 280,
+                            crossAxisSpacing: 16,
+                            mainAxisSpacing: 16,
+                          ),
+                          itemCount: _units.length,
+                          itemBuilder: (context, index) {
+                            String unitId = _units.keys.elementAt(index);
+                            Map<String, dynamic> data = _units[unitId];
+                            String status = data['status'] ?? 'INCONNU';
+                            Map<dynamic, dynamic>? mission = data['active_mission'];
+                            dynamic lat = data['latitude'];
+                            dynamic lng = data['longitude'];
+
+                            return Card(
+                              elevation: 4,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                side: BorderSide(color: _getStatusColor(status), width: 2),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      unitId,
-                                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                                    ),
-                                    Chip(
-                                      label: Text(status, style: const TextStyle(color: Colors.white, fontSize: 12)),
-                                      backgroundColor: _getStatusColor(status),
-                                    ),
-                                  ],
-                                ),
-                                const Divider(color: Colors.grey),
-                                Text(
-                                  'GPS : ${lat != null ? "$lat, $lng" : "En attente de signal..."}',
-                                  style: const TextStyle(fontSize: 13, color: Colors.white70),
-                                ),
-                                const SizedBox(height: 8),
-                                if (mission != null)
-                                  Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.orange.shade900.withOpacity(0.4),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Row(
+                                    Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text('Mission : ${mission['title']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                              Text('Lieu : ${mission['location']}', style: const TextStyle(fontSize: 11)),
-                                            ],
-                                          ),
+                                        Text(
+                                          unitId,
+                                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                                         ),
-                                        IconButton(
-                                          icon: const Icon(Icons.close, size: 18, color: Colors.white),
-                                          onPressed: () => _clearMission(unitId),
-                                          tooltip: 'Clôturer la mission',
+                                        Chip(
+                                          label: Text(status, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                                          backgroundColor: _getStatusColor(status),
                                         ),
                                       ],
                                     ),
-                                  )
-                                else
-                                  const Text('Aucune mission active', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                                
-                                const Spacer(),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2a2a3d)),
-                                    onPressed: () => _sendMissionDialog(unitId),
-                                    icon: const Icon(Icons.send, size: 16),
-                                    label: const Text('Envoyer un ordre de mission'),
-                                  ),
+                                    const Divider(color: Colors.grey),
+                                    Text(
+                                      'GPS : ${lat != null ? "$lat, $lng" : "En attente de signal..."}',
+                                      style: const TextStyle(fontSize: 13, color: Colors.white70),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    if (mission != null)
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.orange.shade900.withOpacity(0.4),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text('Mission : ${mission['title']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                                  Text('Lieu : ${mission['location']}', style: const TextStyle(fontSize: 11)),
+                                                ],
+                                              ),
+                                            ),
+                                            IconButton(
+                                              icon: const Icon(Icons.close, size: 18, color: Colors.white),
+                                              onPressed: () => _clearMission(unitId),
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                    else
+                                      const Text('Aucune mission active', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                                    
+                                    const Spacer(),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2a2a3d)),
+                                        onPressed: () => _sendMissionDialog(unitId),
+                                        icon: const Icon(Icons.send, size: 16),
+                                        label: const Text('Envoyer une mission'),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+                              ),
+                            );
+                          },
+                        ),
             ),
           ],
         ),
