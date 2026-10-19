@@ -366,7 +366,7 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
                                 Map<String, dynamic> data = Map<String, dynamic>.from(_units[unitId] ?? {});
                                 String status = data['status'] ?? 'INCONNU';
                                 Map<dynamic, dynamic>? mission = data['active_mission'];
-                                Map<dynamic, dynamic>? equipment = data['equipment'];
+                                dynamic rawEquipment = data['equipment'];
                                 dynamic lat = data['latitude'];
                                 dynamic lng = data['longitude'];
 
@@ -404,36 +404,38 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
                                             label: const Text('Centrer sur la carte', style: TextStyle(fontSize: 11, color: Colors.blueAccent)),
                                           ),
                                         
-                                        // --- SECTION MATÉRIEL EMBARQUÉ ---
+                                        // --- SECTION MATÉRIEL EMBARQUÉ SÉCURISÉE ---
                                         const SizedBox(height: 6),
                                         const Text('Matériel embarqué :', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white70)),
                                         const SizedBox(height: 4),
-                                        equipment == null || equipment.isEmpty
+                                        rawEquipment == null
                                             ? const Text('Aucun équipement déclaré', style: TextStyle(fontSize: 10, color: Colors.grey))
                                             : Wrap(
                                                 spacing: 4,
                                                 runSpacing: 4,
-                                                children: equipment.entries.map((entry) {
-                                                  bool isChecked = entry.value == true;
-                                                  return Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                    decoration: BoxDecoration(
-                                                      color: isChecked ? Colors.green.withOpacity(0.2) : Colors.grey.withOpacity(0.1),
-                                                      border: Border.all(color: isChecked ? Colors.green : Colors.grey.withOpacity(0.4)),
-                                                      borderRadius: BorderRadius.circular(4),
-                                                   ),
-                                                    child: Text(
-                                                      '${entry.key}: ${isChecked ? "✓" : "✗"}',
-                                                      style: TextStyle(
-                                                        fontSize: 10,
-                                                        color: isChecked ? Colors.greenAccent : Colors.grey,
-                                                        fontWeight: FontWeight.bold,
-                                                      ),
-                                                    ),
-                                                  );
-                                                }).toList(),
+                                                children: (rawEquipment is Map)
+                                                    ? rawEquipment.entries.map((entry) {
+                                                        bool isChecked = entry.value == true;
+                                                        return Container(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                          decoration: BoxDecoration(
+                                                            color: isChecked ? Colors.green.withOpacity(0.2) : Colors.grey.withOpacity(0.1),
+                                                            border: Border.all(color: isChecked ? Colors.green : Colors.grey.withOpacity(0.4)),
+                                                            borderRadius: BorderRadius.circular(4),
+                                                          ),
+                                                          child: Text(
+                                                            '${entry.key}: ${isChecked ? "✓" : "✗"}',
+                                                            style: TextStyle(
+                                                              fontSize: 10,
+                                                              color: isChecked ? Colors.greenAccent : Colors.grey,
+                                                              fontWeight: FontWeight.bold,
+                                                            ),
+                                                          ),
+                                                        );
+                                                      }).toList()
+                                                    : [const Text('Format non reconnu', style: TextStyle(fontSize: 10, color: Colors.red))],
                                               ),
-                                        // ---------------------------------
+                                        // ---------------------------------------------
 
                                         if (mission != null)
                                           Container(
