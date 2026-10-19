@@ -60,7 +60,7 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
   Timer? _sosSoundTimer;
 
   late TabController _tabController;
-  final LatLng _defaultCenter = const LatLng(48.7538, 2.3218); // Fresnes
+  final LatLng _defaultCenter = const LatLng(48.7538, 2.3218); // Fresnes / Val-de-Marne
   String _archiveSearchQuery = "";
 
   @override
@@ -81,9 +81,7 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
   void _triggerSosAlarmLoop(bool active) {
     if (active) {
       if (_sosSoundTimer == null || !_sosSoundTimer!.isActive) {
-        _sosSoundTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-          // Logique d'alerte SOS active
-        });
+        _sosSoundTimer = Timer.periodic(const Duration(seconds: 1), (timer) {});
       }
     } else {
       _sosSoundTimer?.cancel();
@@ -332,7 +330,7 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
                 ),
               ),
               Container(
-                width: 400,
+                width: 420,
                 color: const Color(0xFF12121a),
                 padding: const EdgeInsets.all(12),
                 child: Column(
@@ -368,11 +366,12 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
                                 Map<String, dynamic> data = Map<String, dynamic>.from(_units[unitId] ?? {});
                                 String status = data['status'] ?? 'INCONNU';
                                 Map<dynamic, dynamic>? mission = data['active_mission'];
+                                Map<dynamic, dynamic>? equipment = data['equipment'];
                                 dynamic lat = data['latitude'];
                                 dynamic lng = data['longitude'];
 
                                 return Card(
-                                  margin: const EdgeInsets.only(bottom: 10),
+                                  margin: const EdgeInsets.only(bottom: 12),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                     side: BorderSide(color: _getStatusColor(status), width: 1.5),
@@ -404,9 +403,41 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
                                             icon: const Icon(Icons.my_location, size: 14, color: Colors.blueAccent),
                                             label: const Text('Centrer sur la carte', style: TextStyle(fontSize: 11, color: Colors.blueAccent)),
                                           ),
+                                        
+                                        // --- SECTION MATÉRIEL EMBARQUÉ ---
+                                        const SizedBox(height: 6),
+                                        const Text('Matériel embarqué :', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white70)),
+                                        const SizedBox(height: 4),
+                                        equipment == null || equipment.isEmpty
+                                            ? const Text('Aucun équipement déclaré', style: TextStyle(fontSize: 10, color: Colors.grey))
+                                            : Wrap(
+                                                spacing: 4,
+                                                runSpacing: 4,
+                                                children: equipment.entries.map((entry) {
+                                                  bool isChecked = entry.value == true;
+                                                  return Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: isChecked ? Colors.green.withOpacity(0.2) : Colors.grey.withOpacity(0.1),
+                                                      border: Border.all(color: isChecked ? Colors.green : Colors.grey.withOpacity(0.4)),
+                                                      borderRadius: BorderRadius.circular(4),
+                                                   ),
+                                                    child: Text(
+                                                      '${entry.key}: ${isChecked ? "✓" : "✗"}',
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        color: isChecked ? Colors.greenAccent : Colors.grey,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  );
+                                                }).toList(),
+                                              ),
+                                        // ---------------------------------
+
                                         if (mission != null)
                                           Container(
-                                            margin: const EdgeInsets.only(top: 6),
+                                            margin: const EdgeInsets.only(top: 8),
                                             padding: const EdgeInsets.all(6),
                                             decoration: BoxDecoration(color: Colors.orange.shade900.withOpacity(0.4), borderRadius: BorderRadius.circular(4)),
                                             child: Row(
