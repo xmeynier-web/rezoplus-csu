@@ -2,43 +2,33 @@ name: Deploy Web CSU to GitHub Pages
 
 on:
   push:
-    branches: [ main ]
-
-# Gestion de la concurrence
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
+    branches:
+      - main
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
-    
-    # ⚠️ ÉTAPE OBLIGATOIRE : Donne les droits d'écriture au token GitHub Actions
-    permissions:
-      contents: write
-      pages: write
-      id-token: write
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - name: Set up Java
+        uses: actions/setup-java@v3
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Flutter
+      - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.6'
+          flutter-version: '3.19.x'
           channel: 'stable'
+          cache: true
 
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build Web
+      - name: Build Web release
         run: flutter build web --release --base-href "/rezoplus-csu/"
 
       - name: Deploy to GitHub Pages
