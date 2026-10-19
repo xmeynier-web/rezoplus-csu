@@ -58,7 +58,7 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
   
   bool _hasSosAlert = false;
   late TabController _tabController;
-  final LatLng _defaultCenter = const LatLng(48.7538, 2.3218); // Fresnes
+  final LatLng _defaultCenter = const LatLng(48.7538, 2.3218); // Fresnes / Val-de-Marne
   String _archiveSearchQuery = "";
 
   @override
@@ -226,45 +226,49 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
   Widget build(BuildContext context) {
     List<Marker> markers = [];
     _units.forEach((unitId, data) {
-      if (data is Map && data['latitude'] != null && data['longitude'] != null) {
-        double lat = (data['latitude'] as num).toDouble();
-        double lng = (data['longitude'] as num).toDouble();
-        String status = data['status'] ?? 'INCONNU';
+      if (data is Map) {
+        // Parsing sécurisé des coordonnées GPS (convertit string ou nombre)
+        double? lat = double.tryParse(data['latitude']?.toString() ?? '');
+        double? lng = double.tryParse(data['longitude']?.toString() ?? '');
+        
+        if (lat != null && lng != null) {
+          String status = data['status'] ?? 'INCONNU';
 
-        markers.add(
-          Marker(
-            point: LatLng(lat, lng),
-            width: 80,
-            height: 80,
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.black87,
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: _getStatusColor(status)),
+          markers.add(
+            Marker(
+              point: LatLng(lat, lng),
+              width: 80,
+              height: 80,
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.black87,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: _getStatusColor(status)),
+                    ),
+                    child: Text(
+                      unitId,
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
                   ),
-                  child: Text(
-                    unitId,
-                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                  Icon(
+                    Icons.local_police,
+                    color: _getStatusColor(status),
+                    size: 32,
                   ),
-                ),
-                Icon(
-                  Icons.local_police,
-                  color: _getStatusColor(status),
-                  size: 32,
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
+          );
+        }
       }
     });
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('REZO+ // CSU Commandement [Unités en direct : ${_units.length}]'),
+        title: Text('REZO+ // CSU Commandement [Unités connectées : ${_units.length}]'),
         backgroundColor: _hasSosAlert ? Colors.red.shade900 : const Color(0xFF1a1a2e),
         bottom: TabBar(
           controller: _tabController,
@@ -289,7 +293,6 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
                     initialZoom: 13.5,
                   ),
                   children: [
-                    // Tuiles OpenStreetMap officielles (Sans clé d'API requise)
                     TileLayer(
                       urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                       userAgentPackageName: 'com.rezoplus.csu',
@@ -299,7 +302,7 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
                 ),
               ),
               Container(
-                width: 400,
+                width: 420,
                 color: const Color(0xFF12121a),
                 padding: const EdgeInsets.all(12),
                 child: Column(
@@ -323,7 +326,7 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
                           ],
                         ),
                       ),
-                    const Text('Équipages en service (Firebase) :', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const Text('Équipages en service :', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     Expanded(
                       child: _units.isEmpty
@@ -335,9 +338,17 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
                                 Map<String, dynamic> data = Map<String, dynamic>.from(_units[unitId] ?? {});
                                 String status = data['status'] ?? 'INCONNU';
                                 Map<dynamic, dynamic>? mission = data['active_mission'];
-                                dynamic rawEquipment = data['equipment'];
-                                dynamic lat = data['latitude'];
-                                dynamic lng = data['longitude'];
+                                
+                                // Récupération robuste du matériel sous forme de Map
+                                Map<String, dynamic> equipment = {};
+                                if (data['equipment'] != null && data['equipment'] is Map) {
+                                  (data['equipment'] as Map).forEach((k, v) {
+                                    equipment[k.toString()] = (v == true || v.toString().toLowerCase() == 'true');
+                                  });
+                                }
+
+                                dynamic rawLat = data['latitude'];
+                                dynamic rawLng = data['longitude'];
 
                                 return Card(
                                   margin: const EdgeInsets.only(bottom: 12),
@@ -362,53 +373,60 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
                                           ],
                                         ),
                                         const SizedBox(height: 4),
-                                        Text('GPS : ${lat != null ? "$lat, $lng" : "En attente..."}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                                        if (lat != null && lng != null)
+                                        Text(
+                                          'GPS : ${rawLat != null && rawLng != null ? "$rawLat, $rawLng" : "En attente de position..."}', 
+                                          style: TextStyle(fontSize: 11, color: rawLat != null ? Colors.greenAccent : Colors.grey),
+                                        ),
+                                        if (rawLat != null && rawLng != null)
                                           TextButton.icon(
                                             style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
                                             onPressed: () {
-                                              _mapController.move(LatLng((lat as num).toDouble(), (lng as num).toDouble()), 16.0);
+                                              double? lat = double.tryParse(rawLat.toString());
+                                              double? lng = double.tryParse(rawLng.toString());
+                                              if (lat != null && lng != null) {
+                                                _mapController.move(LatLng(lat, lng), 16.0);
+                                              }
                                             },
                                             icon: const Icon(Icons.my_location, size: 14, color: Colors.blueAccent),
                                             label: const Text('Centrer sur la carte', style: TextStyle(fontSize: 11, color: Colors.blueAccent)),
                                           ),
                                         
-                                        // --- LECTURE DU MATÉRIEL EMBARQUÉ ---
-                                        const SizedBox(height: 8),
+                                        const Divider(color: Colors.white24, height: 16),
+                                        
+                                        // --- AFFICHAGE GARANTI DU MATÉRIEL EMBARQUÉ ---
                                         const Text('Matériel embarqué :', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white70)),
-                                        const SizedBox(height: 4),
-                                        rawEquipment == null
-                                            ? const Text('Aucun matériel transmis', style: TextStyle(fontSize: 10, color: Colors.grey))
+                                        const SizedBox(height: 6),
+                                        equipment.isEmpty
+                                            ? const Text('Aucun équipement transmis par l\'unité', style: TextStyle(fontSize: 10, color: Colors.grey))
                                             : Wrap(
                                                 spacing: 4,
                                                 runSpacing: 4,
-                                                children: (rawEquipment is Map)
-                                                    ? rawEquipment.entries.map((entry) {
-                                                        bool isChecked = entry.value == true;
-                                                        return Container(
-                                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                          decoration: BoxDecoration(
-                                                            color: isChecked ? Colors.green.withOpacity(0.2) : Colors.grey.withOpacity(0.1),
-                                                            border: Border.all(color: isChecked ? Colors.green : Colors.grey.withOpacity(0.4)),
-                                                            borderRadius: BorderRadius.circular(4),
-                                                          ),
-                                                          child: Text(
-                                                            '${entry.key}: ${isChecked ? "✓" : "✗"}',
-                                                            style: TextStyle(
-                                                              fontSize: 10,
-                                                              color: isChecked ? Colors.greenAccent : Colors.grey,
-                                                              fontWeight: FontWeight.bold,
-                                                            ),
-                                                          ),
-                                                        );
-                                                      }).toList()
-                                                    : [const Text('Données matériel invalides', style: TextStyle(fontSize: 10, color: Colors.red))],
+                                                children: equipment.entries.map((entry) {
+                                                  bool isChecked = entry.value;
+                                                  return Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                                    decoration: BoxDecoration(
+                                                      color: isChecked ? Colors.green.withOpacity(0.25) : Colors.grey.withOpacity(0.1),
+                                                      border: Border.all(color: isChecked ? Colors.green : Colors.grey.withOpacity(0.4)),
+                                                      borderRadius: BorderRadius.circular(4),
+                                                    ),
+                                                    child: Text(
+                                                      '${entry.key}: ${isChecked ? "✓" : "✗"}',
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        color: isChecked ? Colors.greenAccent : Colors.grey,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  );
+                                                }).toList(),
                                               ),
+                                        // ---------------------------------------------
 
                                         if (mission != null)
                                           Container(
-                                            margin: const EdgeInsets.only(top: 8),
-                                            padding: const EdgeInsets.all(6),
+                                            margin: const EdgeInsets.only(top: 10),
+                                            padding: const EdgeInsets.all(8),
                                             decoration: BoxDecoration(color: Colors.orange.shade900.withOpacity(0.4), borderRadius: BorderRadius.circular(4)),
                                             child: Row(
                                               children: [
@@ -428,7 +446,7 @@ class _DispatchDashboardState extends State<DispatchDashboard> with SingleTicker
                                               ],
                                             ),
                                           ),
-                                        const SizedBox(height: 8),
+                                        const SizedBox(height: 10),
                                         SizedBox(
                                           width: double.infinity,
                                           height: 32,
