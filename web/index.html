@@ -1,25 +1,260 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
-  <base href="$FLUTTER_BASE_HREF">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rezo+ PC - Poste de Commandement Opérationnel</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        body { display: flex; height: 100vh; background: #1a1a24; color: #fff; overflow: hidden; }
+        
+        /* Sidebar Unités & Dispatch */
+        #sidebar { width: 400px; background: #222230; padding: 15px; display: flex; flex-direction: column; gap: 15px; border-right: 2px solid #333; overflow-y: auto; }
+        
+        /* Cartouches d'unités avec fonds et bordures ultra-visibles */
+        .card { padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 8px solid #0088ff; background: #2d2d3f; transition: all 0.2s ease; }
+        
+        .card.sos { border-left-color: #ff2222 !important; background: #4a1515 !important; border: 1px solid #ff2222; animation: blink 1s infinite; }
+        .card.intervention { border-left-color: #ff8800 !important; background: #3d2612 !important; border: 1px solid #ff8800; }
+        .card.patrouille { border-left-color: #22bb33 !important; background: #123018 !important; }
+        .card.transport { border-left-color: #00a8ff !important; background: #12223b !important; }
+        .card.retour { border-left-color: #9c27b0 !important; background: #2b1638 !important; }
+        .card.hors_service { border-left-color: #777777 !important; background: #222226 !important; opacity: 0.7; }
 
-  <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="Plateforme de supervision CSU / PC de Commandement Rezo+">
+        /* Module Dispatch */
+        .dispatch-box { background: #262638; padding: 12px; border-radius: 8px; border: 1px solid #444; display: flex; flex-direction: column; gap: 8px; }
+        .dispatch-box input, .dispatch-box select { padding: 8px; border-radius: 4px; border: none; background: #1a1a24; color: #fff; }
+        .dispatch-box button { padding: 8px; background: #ff8800; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
 
-  <!-- iOS meta tags & icons -->
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="Rezo+ CSU">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+        /* Zone Carte */
+        #map-container { flex: 1; position: relative; }
+        #map { width: 100%; height: 100%; }
 
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
+        /* Main-Courante */
+        #main-courante { width: 380px; background: #222230; padding: 15px; border-left: 2px solid #333; display: flex; flex-direction: column; }
+        .log-entry { background: #2d2d3f; padding: 8px; border-radius: 5px; margin-bottom: 8px; font-size: 13px; border-left: 3px solid #00a8ff; }
 
-  <title>Rezo+ CSU</title>
-  <link rel="manifest" href="manifest.json">
+        /* Bouton centrer la carte */
+        .btn-locate { background: #0088ff; color: #fff; border: none; padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-top: 6px; font-weight: bold; }
+        .btn-locate:hover { background: #0066cc; }
+
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+    </style>
 </head>
 <body>
-  <script src="flutter_bootstrap.js" async></script>
+
+    <!-- Barre latérale : Dispatch & Unités connectées -->
+    <div id="sidebar">
+        <h2>Poste de Commandement</h2>
+        
+        <!-- Module d'envoi en intervention (Dispatch) -->
+        <div class="dispatch-box">
+            <h3>📢 Dispatch Intervention</h3>
+            <select id="target-unit">
+                <option value="">Sélectionner une unité...</option>
+            </select>
+            <input type="text" id="mission-title" placeholder="Objet de l'intervention (ex: Vol, Contrôle...)">
+            <input type="text" id="mission-location" placeholder="Adresse ou lieu-dit">
+            <button onclick="sendMission()">Transmettre l'ordre de mission</button>
+        </div>
+
+        <hr style="border-color: #444;">
+
+        <h2>Unités en Ligne</h2>
+        <div id="units-container">
+            <div class="card patrouille">
+                <h3>ALPHA-1 (Système)</h3>
+                <p>Statut : <strong>EN ATTENTE</strong></p>
+                <p style="font-size: 11px; margin-top: 4px; color: #aaa;">Connexion Firebase active...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Carte interactive -->
+    <div id="map-container">
+        <div id="map"></div>
+    </div>
+
+    <!-- Main-Courante Informatisée (MCI) -->
+    <div id="main-courante">
+        <h2>Main-Courante (MCI)</h2>
+        <div style="margin: 10px 0; display: flex; gap: 5px;">
+            <input type="text" id="mc-input" placeholder="Nouvel événement / observation..." style="flex: 1; padding: 8px; border-radius: 4px; border: none; background: #1a1a24; color: #fff;">
+            <button onclick="addLog()" style="padding: 8px 12px; background: #0088ff; color: #fff; border: none; border-radius: 4px; cursor: pointer;">Consigner</button>
+        </div>
+        <div id="logs-container" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 6px;"></div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // Configuration Firebase officielle
+        const firebaseConfig = {
+          apiKey: "AIzaSyCu0BK4h2hhaGV4C46C9y65rBJlnLftq3A",
+          authDomain: "rezoplus-police.firebaseapp.com",
+          databaseURL: "https://rezoplus-police-default-rtdb.europe-west1.firebasedatabase.app",
+          projectId: "rezoplus-police",
+          storageBucket: "rezoplus-police.firebasestorage.app",
+          messagingSenderId: "561209004165",
+          appId: "1:561209004165:web:4c19c7b505bf7ad7df19ec"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // Initialisation de la carte Leaflet (centrée sur Fresnes)
+        const map = L.map('map').setView([48.7538, 2.3218], 14);
+
+        // Serveur Esri World Street Map (Libre, HD, sans restriction ni clé API)
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19,
+            attribution: 'Tiles &copy; Esri'
+        }).addTo(map);
+
+        // Forcer l'affichage complet de la carte au chargement
+        setTimeout(() => { map.invalidateSize(); }, 300);
+
+        const markers = {};
+
+        // Correspondance des classes CSS selon le statut Firebase
+        function getStatusClass(status) {
+            switch(status) {
+                case 'SOS_ACTIF': return 'sos';
+                case 'EN_INTERVENTION': return 'intervention';
+                case 'EN_PATROUILLE': return 'patrouille';
+                case 'TRANSPORT': return 'transport';
+                case 'RETOUR_POSTE': return 'retour';
+                default: return 'hors_service';
+            }
+        }
+
+        // Écoute en temps réel des unités sur Firebase
+        db.ref('units').on('value', (snapshot) => {
+            const units = snapshot.val();
+            const unitsContainer = document.getElementById('units-container');
+            const targetSelect = document.getElementById('target-unit');
+            
+            const currentSelected = targetSelect.value;
+            unitsContainer.innerHTML = '';
+            targetSelect.innerHTML = '<option value="">Sélectionner une unité...</option>';
+
+            if (!units) return;
+
+            Object.keys(units).forEach((unitId) => {
+                const unit = units[unitId];
+                
+                const option = document.createElement('option');
+                option.value = unitId;
+                option.textContent = unitId;
+                targetSelect.appendChild(option);
+
+                let lat = parseFloat(unit.latitude);
+                let lng = parseFloat(unit.longitude);
+
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    if (markers[unitId]) {
+                        markers[unitId].setLatLng([lat, lng]);
+                        markers[unitId].setPopupContent(`<b>${unitId}</b><br>Statut: ${unit.status || 'INCONNU'}`);
+                    } else {
+                        markers[unitId] = L.marker([lat, lng]).addTo(map)
+                            .bindPopup(`<b>${unitId}</b><br>Statut: ${unit.status || 'INCONNU'}`);
+                    }
+                }
+
+                let equipmentText = "Matériel non renseigné";
+                if (unit.equipment && typeof unit.equipment === 'object') {
+                    const checkedItems = Object.keys(unit.equipment).filter(key => unit.equipment[key] === true || unit.equipment[key] === 'true');
+                    if (checkedItems.length > 0) {
+                        equipmentText = "Embarqué : " + checkedItems.join(', ');
+                    } else {
+                        equipmentText = "Aucun matériel coché";
+                    }
+                }
+
+                const cardClass = getStatusClass(unit.status);
+                const cardDiv = document.createElement('div');
+                cardDiv.className = `card ${cardClass}`;
+                
+                let gpsHtml = (!isNaN(lat) && !isNaN(lng)) 
+                    ? `<p style="font-size: 11px; margin-top: 4px; color: #4caf50;">GPS : ${lat.toFixed(4)}, ${lng.toFixed(4)}</p>
+                       <button class="btn-locate" onclick="centerMapOnUnit(${lat}, ${lng}, '${unitId}')">📍 Centrer sur la carte</button>`
+                    : `<p style="font-size: 11px; margin-top: 4px; color: #ff9800;">GPS : En attente de position...</p>`;
+
+                cardDiv.innerHTML = `
+                    <h3>${unitId}</h3>
+                    <p>Statut : <strong>${unit.status || 'INDISPONIBLE'}</strong></p>
+                    ${gpsHtml}
+                    <p style="font-size: 11px; margin-top: 6px; color: #ccc;">${equipmentText}</p>
+                `;
+                unitsContainer.appendChild(cardDiv);
+            });
+
+            targetSelect.value = currentSelected;
+        });
+
+        function centerMapOnUnit(lat, lng, unitId) {
+            map.setView([lat, lng], 16, { animate: true });
+            if (markers[unitId]) {
+                markers[unitId].openPopup();
+            }
+        }
+
+        function sendMission() {
+            const unitId = document.getElementById('target-unit').value;
+            const title = document.getElementById('mission-title').value;
+            const location = document.getElementById('mission-location').value;
+
+            if (!unitId || !title) {
+                alert("Veuillez sélectionner une unité et indiquer l'objet de l'intervention.");
+                return;
+            }
+
+            db.ref(`units/${unitId}/active_mission`).set({
+                title: title,
+                location: location || "Non précisée",
+                timestamp: Date.now(),
+                status: "EN_ATTENTE_ACCEPTATION"
+            });
+
+            db.ref('mains_courantes').push({
+                message: `DISPATCH -> ${unitId} : ${title} (${location})`,
+                timestamp: Date.now(),
+                author: 'Opérateur PC'
+            });
+
+            alert(`Ordre de mission transmis avec succès à l'équipage ${unitId}`);
+            document.getElementById('mission-title').value = '';
+            document.getElementById('mission-location').value = '';
+        }
+
+        function addLog() {
+            const input = document.getElementById('mc-input');
+            if (!input.value) return;
+
+            db.ref('mains_courantes').push({
+                message: input.value,
+                timestamp: Date.now(),
+                author: 'Opérateur PC'
+            });
+            input.value = '';
+        }
+
+        db.ref('mains_courantes').on('child_added', (snapshot) => {
+            const log = snapshot.val();
+            const time = new Date(log.timestamp).toLocaleTimeString();
+            
+            const logsContainer = document.getElementById('logs-container');
+            const logDiv = document.createElement('div');
+            logDiv.className = 'log-entry';
+            logDiv.innerHTML = `<strong>[${time}]</strong> ${log.message}`;
+            logsContainer.prepend(logDiv);
+        });
+    </script>
 </body>
 </html>
