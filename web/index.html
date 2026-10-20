@@ -57,7 +57,7 @@
         </div>
 
         <div class="info-box">
-            📍 <strong>Position par défaut :</strong> Rue Roger Salengro, Fresnes.<br>Vous pouvez glisser l'épingle pour la repositionner.
+            📍 <strong>Position Poste :</strong> 14 rue Roger Salengro, Fresnes (recalé sur 03).<br>Vous pouvez glisser chaque épingle pour la repositionner.
         </div>
 
         <hr style="border-color: #444;">
@@ -99,11 +99,11 @@
         }
         const db = firebase.database();
 
-        // Coordonnées ajustées exactement sur l'emplacement de la pastille 03 (Rue Roger Salengro)
+        // Coordonnées exactes du repère vert 03 (Haut de la Rue Roger Salengro)
         const DEFAULT_LAT = 48.7563;
         const DEFAULT_LNG = 2.3215;
 
-        const map = L.map('map').setView([DEFAULT_LAT, DEFAULT_LNG], 15);
+        const map = L.map('map').setView([DEFAULT_LAT, DEFAULT_LNG], 16);
 
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 19,
@@ -162,17 +162,17 @@
                     opt1.value = unitId; opt1.textContent = unitId;
                     targetSelect.appendChild(opt1);
 
-                    // Prise en compte de la position : Position Manuelle > GPS Mobile (si différent de l'ancien bug) > Adresse par défaut ajustée
+                    // Priorité : 1. Position glissée manuellement | 2. Position ajustée du Poste (48.7563, 2.3215)
                     let lat = manualPositions[unitId] ? manualPositions[unitId].lat : DEFAULT_LAT;
                     let lng = manualPositions[unitId] ? manualPositions[unitId].lng : DEFAULT_LNG;
 
-                    // Si l'unité a des coordonnées valides et qu'elle n'est pas encore positionnée manuellement
+                    // Si l'unité envoie de vraies coordonnées GPS mobiles (non nulles et non égales à l'ancien point erroné)
                     if (!manualPositions[unitId] && unit.latitude && unit.longitude) {
                         const parsedLat = parseFloat(unit.latitude);
                         const parsedLng = parseFloat(unit.longitude);
                         if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
-                            // Si ce n'est pas l'ancienne valeur erronée 48.7538, 2.3218
-                            if (Math.abs(parsedLat - 48.7538) > 0.001 || Math.abs(parsedLng - 2.3218) > 0.001) {
+                            // On exclut les coordonnées de l'ancien bug (48.7538, 2.3218)
+                            if (Math.abs(parsedLat - 48.7538) > 0.0005 || Math.abs(parsedLng - 2.3218) > 0.0005) {
                                 lat = parsedLat;
                                 lng = parsedLng;
                             }
@@ -288,7 +288,7 @@
                 author: 'Opérateur PC'
             });
 
-            alert(`Ordre de mission transmitted à ${unitId} !`);
+            alert(`Ordre de mission transmis à ${unitId} !`);
             document.getElementById('mission-title').value = '';
             document.getElementById('mission-location').value = '';
         }
