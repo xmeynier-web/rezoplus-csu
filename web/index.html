@@ -33,16 +33,6 @@
         #map-container { flex: 1; height: 100vh; position: relative; display: block; }
         #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
 
-        /* Écran de visée transparent qui s'active par-dessus la carte en mode radio */
-        #map-click-overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 9999;
-            cursor: crosshair;
-            display: none;
-            background: rgba(0, 255, 204, 0.05);
-        }
-
         #main-courante { width: 380px; min-width: 380px; background: #222230; padding: 15px; border-left: 2px solid #333; display: flex; flex-direction: column; z-index: 10; }
         .log-entry { background: #2d2d3f; padding: 8px; border-radius: 5px; margin-bottom: 8px; font-size: 13px; border-left: 3px solid #00a8ff; }
 
@@ -69,7 +59,7 @@
 
         <div class="radio-box" id="radio-box-container">
             <h3>📍 Repositionnement Radio</h3>
-            <select id="radio-unit">
+            <select id="radio-unit" onchange="onRadioUnitSelectChange(this)">
                 <option value="">Sélectionner une unité à déplacer...</option>
             </select>
             <button id="btn-toggle-radio" onclick="toggleRadioMode()">Activer le clic sur la carte</button>
@@ -84,8 +74,6 @@
 
     <div id="map-container">
         <div id="map"></div>
-        <!-- Couche de capture des clics radio -->
-        <div id="map-click-overlay" onclick="handleMapOverlayClick(event)"></div>
     </div>
 
     <div id="main-courante">
@@ -127,50 +115,16 @@
         setTimeout(() => { map.invalidateSize(); }, 500);
 
         const markers = {};
+        let selectedRadioUnitId = "";
         let radioRepositionMode = false;
 
-        // Gestionnaire de clic direct sur la couche transparente positionnée au-dessus de la carte
-        function handleMapOverlayClick(e) {
-            if (!radioRepositionMode) return;
-
-            const unitId = document.getElementById('radio-unit').value;
-            if (!unitId) {
-                alert("⚠️ Veuillez d'abord sélectionner une unité.");
-                toggleRadioMode();
-                return;
-            }
-
-            // Conversion des coordonnées écran du clic en coordonnées géographiques Leaflet (lat/lng)
-            const rect = document.getElementById('map-container').getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            const latlng = map.containerPointToLatLng([x, y]);
-
-            const lat = latlng.lat;
-            const lng = latlng.lng;
-
-            // Mise à jour de Firebase
-            db.ref(`units/${unitId}`).update({
-                latitude: lat,
-                longitude: lng,
-                derniere_maj: firebase.database.ServerValue.timestamp
-            });
-
-            // Ajout dans la main courante
-            db.ref('mains_courantes').push({
-                message: `RADIO -> Repositionnement de ${unitId} à (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
-                timestamp: Date.now(),
-                author: 'Opérateur PC'
-            });
-
-            alert(`✅ Picto de l'unité ${unitId} déplacé avec succès !`);
-            toggleRadioMode();
+        function onRadioUnitSelectChange(selectElem) {
+            selectedRadioUnitId = selectElem.value;
         }
 
         function toggleRadioMode() {
-            const unitId = document.getElementById('radio-unit').value;
-            if (!radioRepositionMode && !unitId) {
-                alert("⚠️ Veuillez d'abord sélectionner une unité à déplacer.");
+            if (!selectedRadioUnitId) {
+                alert("⚠️ Veuillez d'abord sélectionner une unité dans le menu déroulant.");
                 return;
             }
 
@@ -178,24 +132,48 @@
             const box = document.getElementById('radio-box-container');
             const btn = document.getElementById('btn-toggle-radio');
             const statusText = document.getElementById('radio-status-text');
-            const overlay = document.getElementById('map-click-overlay');
 
             if (radioRepositionMode) {
                 box.classList.add('radio-mode-active');
                 btn.style.background = '#ff2222';
                 btn.textContent = "Annuler le repositionnement";
-                statusText.textContent = "👉 MODE ACTIF : Cliquez n'importe où sur la carte.";
+                statusText.textContent = `👉 MODE ACTIF : Cliquez sur la carte pour replacer ${selectedRadioUnitId}.`;
                 statusText.style.color = "#00ffcc";
-                overlay.style.display = 'block'; // Active la couche de capture
+                map.getContainer().style.cursor = 'crosshair';
             } else {
                 box.classList.remove('radio-mode-active');
                 btn.style.background = '#0088ff';
                 btn.textContent = "Activer le clic sur la carte";
                 statusText.textContent = "Sélectionnez une unité puis cliquez sur le bouton.";
                 statusText.style.color = "#aaa";
-                overlay.style.display = 'none'; // Désactive la couche
+                map.getContainer().style.cursor = '';
             }
         }
+
+        // Écouteur de clic sur la carte Leaflet
+        map.on('click', function(e) {
+            if (!radioRepositionMode || !selectedRadioUnitId) return;
+
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+
+            // Update Firebase
+            db.ref(`units/${selectedRadioUnitId}`).update({
+                latitude: lat,
+                longitude: lng,
+                derniere_maj: firebase.database.ServerValue.timestamp
+            });
+
+            // Enregistrement Main Courante
+            db.ref('mains_courantes').push({
+                message: `RADIO -> Repositionnement manuel de ${selectedRadioUnitId} à (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
+                timestamp: Date.now(),
+                author: 'Opérateur PC'
+            });
+
+            alert(`✅ Unité ${selectedRadioUnitId} repositionnée avec succès !`);
+            toggleRadioMode();
+        });
 
         function getStatusClass(status) {
             switch(status) {
@@ -216,7 +194,6 @@
             const radioSelect = document.getElementById('radio-unit');
             
             const currentSelectedTarget = targetSelect.value;
-            const currentSelectedRadio = radioSelect.value;
 
             unitsContainer.innerHTML = '';
             targetSelect.innerHTML = '<option value="">Sélectionner une unité...</option>';
@@ -224,6 +201,7 @@
 
             if (!units) {
                 unitsContainer.innerHTML = '<p style="font-size: 12px; color: #aaa; text-align: center; padding: 10px;">Aucune unité en ligne</p>';
+                selectedRadioUnitId = "";
                 return;
             }
 
@@ -236,6 +214,9 @@
 
                 const opt2 = document.createElement('option');
                 opt2.value = unitId; opt2.textContent = unitId;
+                if (unitId === selectedRadioUnitId) {
+                    opt2.selected = true;
+                }
                 radioSelect.appendChild(opt2);
 
                 let lat = parseFloat(unit.latitude);
@@ -278,7 +259,7 @@
             });
 
             targetSelect.value = currentSelectedTarget;
-            radioSelect.value = currentSelectedRadio;
+            radioSelect.value = selectedRadioUnitId;
         });
 
         function centerMapOnUnit(lat, lng, unitId) {
