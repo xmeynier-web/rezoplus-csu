@@ -9,9 +9,9 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
-        body { display: flex; height: 100vh; background: #1a1a24; color: #fff; overflow: hidden; }
+        body { display: flex; height: 100vh; width: 100vw; background: #1a1a24; color: #fff; overflow: hidden; }
         
-        #sidebar { width: 400px; background: #222230; padding: 15px; display: flex; flex-direction: column; gap: 15px; border-right: 2px solid #333; overflow-y: auto; }
+        #sidebar { width: 400px; min-width: 400px; background: #222230; padding: 15px; display: flex; flex-direction: column; gap: 15px; border-right: 2px solid #333; overflow-y: auto; z-index: 10; }
         
         .card { padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 8px solid #0088ff; background: #2d2d3f; transition: all 0.2s ease; }
         
@@ -30,10 +30,10 @@
         
         .radio-mode-active { border: 2px dashed #00ffcc !important; }
 
-        #map-container { flex: 1; position: relative; }
-        #map { width: 100%; height: 100%; }
+        #map-container { flex: 1; height: 100vh; position: relative; display: block; }
+        #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
 
-        #main-courante { width: 380px; background: #222230; padding: 15px; border-left: 2px solid #333; display: flex; flex-direction: column; }
+        #main-courante { width: 380px; min-width: 380px; background: #222230; padding: 15px; border-left: 2px solid #333; display: flex; flex-direction: column; z-index: 10; }
         .log-entry { background: #2d2d3f; padding: 8px; border-radius: 5px; margin-bottom: 8px; font-size: 13px; border-left: 3px solid #00a8ff; }
 
         .btn-locate { background: #0088ff; color: #fff; border: none; padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-top: 6px; font-weight: bold; }
@@ -47,7 +47,6 @@
     <div id="sidebar">
         <h2>Poste de Commandement</h2>
         
-        <!-- Dispatch Mission -->
         <div class="dispatch-box">
             <h3>📢 Dispatch Intervention</h3>
             <select id="target-unit">
@@ -58,7 +57,6 @@
             <button onclick="sendMission()">Transmettre l'ordre de mission</button>
         </div>
 
-        <!-- Repositionnement Radio -->
         <div class="radio-box" id="radio-box-container">
             <h3>📍 Repositionnement Radio</h3>
             <select id="radio-unit">
@@ -102,22 +100,25 @@
           appId: "1:561209004165:web:4c19c7b505bf7ad7df19ec"
         };
 
-        firebase.initializeApp(firebaseConfig);
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
         const db = firebase.database();
 
+        // Initialisation de la carte Leaflet centrée sur Fresnes
         const map = L.map('map').setView([48.7538, 2.3218], 14);
 
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
-            attribution: 'Tiles &copy; Esri'
+            attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        setTimeout(() => { map.invalidateSize(); }, 300);
+        // Forcer le rechargement de la taille de la carte après affichage
+        setTimeout(() => { map.invalidateSize(); }, 500);
 
         const markers = {};
         let radioRepositionMode = false;
 
-        // Gestion du clic sur la carte pour repositionner manuellement une unité suite à un compte-rendu radio
         map.on('click', function(e) {
             if (!radioRepositionMode) return;
 
@@ -131,22 +132,20 @@
             const lat = e.latlng.lat;
             const lng = e.latlng.lng;
 
-            // Mise à jour de la position dans Firebase
             db.ref(`units/${unitId}`).update({
                 latitude: lat,
                 longitude: lng,
                 derniere_maj: firebase.database.ServerValue.timestamp
             });
 
-            // Consignation dans la main courante
             db.ref('mains_courantes').push({
-                message: `RADIO -> Repositionnement manuel de ${unitId} sur le terrain (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
+                message: `RADIO -> Repositionnement manuel de ${unitId} (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
                 timestamp: Date.now(),
                 author: 'Opérateur PC'
             });
 
-            alert(`Picto de l'unité ${unitId} repositionné avec succès sur la carte !`);
-            toggleRadioMode(); // Désactivation du mode après le clic
+            alert(`Picto de l'unité ${unitId} repositionné avec succès !`);
+            toggleRadioMode();
         });
 
         function toggleRadioMode() {
@@ -159,7 +158,7 @@
                 box.classList.add('radio-mode-active');
                 btn.style.background = '#ff2222';
                 btn.textContent = "Annuler le repositionnement";
-                statusText.textContent = "👉 Mode actif : Cliquez sur la carte à l'emplacement indiqué par la radio.";
+                statusText.textContent = "👉 Cliquez sur la carte à l'emplacement indiqué.";
                 statusText.style.color = "#00ffcc";
             } else {
                 box.classList.remove('radio-mode-active');
@@ -182,6 +181,7 @@
             }
         }
 
+        // Écoute des unités Firebase
         db.ref('units').on('value', (snapshot) => {
             const units = snapshot.val();
             const unitsContainer = document.getElementById('units-container');
@@ -195,12 +195,14 @@
             targetSelect.innerHTML = '<option value="">Sélectionner une unité...</option>';
             radioSelect.innerHTML = '<option value="">Sélectionner une unité à déplacer...</option>';
 
-            if (!units) return;
+            if (!units) {
+                unitsContainer.innerHTML = '<p style="font-size: 12px; color: #aaa; text-align: center; padding: 10px;">Aucune unité en ligne</p>';
+                return;
+            }
 
             Object.keys(units).forEach((unitId) => {
                 const unit = units[unitId];
                 
-                // Remplissage des menus déroulants
                 const opt1 = document.createElement('option');
                 opt1.value = unitId; opt1.textContent = unitId;
                 targetSelect.appendChild(opt1);
@@ -231,4 +233,86 @@
                 }
 
                 const cardClass = getStatusClass(unit.status);
-                const cardDiv = document.createElement('div
+                const cardDiv = document.createElement('div');
+                cardDiv.className = `card ${cardClass}`;
+                
+                let gpsHtml = (!isNaN(lat) && !isNaN(lng)) 
+                    ? `<p style="font-size: 11px; margin-top: 4px; color: #4caf50;">GPS : ${lat.toFixed(4)}, ${lng.toFixed(4)}</p>
+                       <button class="btn-locate" onclick="centerMapOnUnit(${lat}, ${lng}, '${unitId}')">📍 Centrer sur la carte</button>`
+                    : `<p style="font-size: 11px; margin-top: 4px; color: #ff9800;">GPS : En attente...</p>`;
+
+                cardDiv.innerHTML = `
+                    <h3>${unitId}</h3>
+                    <p>Statut : <strong>${unit.status || 'INDISPONIBLE'}</strong></p>
+                    ${gpsHtml}
+                    <p style="font-size: 11px; margin-top: 6px; color: #ccc;">${equipmentText}</p>
+                `;
+                unitsContainer.appendChild(cardDiv);
+            });
+
+            targetSelect.value = currentSelectedTarget;
+            radioSelect.value = currentSelectedRadio;
+        });
+
+        function centerMapOnUnit(lat, lng, unitId) {
+            map.setView([lat, lng], 16, { animate: true });
+            if (markers[unitId]) {
+                markers[unitId].openPopup();
+            }
+        }
+
+        function sendMission() {
+            const unitId = document.getElementById('target-unit').value;
+            const title = document.getElementById('mission-title').value;
+            const location = document.getElementById('mission-location').value;
+
+            if (!unitId || !title) {
+                alert("Veuillez sélectionner une unité et indiquer l'objet de l'intervention.");
+                return;
+            }
+
+            db.ref(`units/${unitId}`).update({
+                status: "EN_INTERVENTION",
+                active_mission: {
+                    title: title,
+                    location: location || "Non précisée",
+                    timestamp: Date.now()
+                }
+            });
+
+            db.ref('mains_courantes').push({
+                message: `DISPATCH -> ${unitId} : ${title} (${location})`,
+                timestamp: Date.now(),
+                author: 'Opérateur PC'
+            });
+
+            alert(`Ordre de mission transmis à ${unitId} !`);
+            document.getElementById('mission-title').value = '';
+            document.getElementById('mission-location').value = '';
+        }
+
+        function addLog() {
+            const input = document.getElementById('mc-input');
+            if (!input.value) return;
+
+            db.ref('mains_courantes').push({
+                message: input.value,
+                timestamp: Date.now(),
+                author: 'Opérateur PC'
+            });
+            input.value = '';
+        }
+
+        db.ref('mains_courantes').limitToLast(50).on('child_added', (snapshot) => {
+            const log = snapshot.val();
+            const time = new Date(log.timestamp).toLocaleTimeString();
+            
+            const logsContainer = document.getElementById('logs-container');
+            const logDiv = document.createElement('div');
+            logDiv.className = 'log-entry';
+            logDiv.innerHTML = `<strong>[${time}]</strong> ${log.message}`;
+            logsContainer.prepend(logDiv);
+        });
+    </script>
+</body>
+</html>
