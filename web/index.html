@@ -57,7 +57,7 @@
         </div>
 
         <div class="info-box">
-            💡 <strong>Astuce Radio :</strong> Vous pouvez <u>glisser-déposer</u> directement l'épingle carrée d'une unité sur la carte pour la replacer suite à un compte-rendu radio.
+            💡 <strong>Radio :</strong> Glissez l'épingle sur la carte. Sa position restera fixée là où vous l'avez posée malgré les changements de statut.
         </div>
 
         <hr style="border-color: #444;">
@@ -81,7 +81,7 @@
 
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></script>
 
     <script>
         const firebaseConfig = {
@@ -109,6 +109,7 @@
         setTimeout(() => { map.invalidateSize(); }, 500);
 
         const markers = {};
+        const manualPositions = {}; // Mémorise les positions forcées par l'opérateur
 
         function getStatusColor(status) {
             switch(status) {
@@ -156,13 +157,14 @@
                 opt1.value = unitId; opt1.textContent = unitId;
                 targetSelect.appendChild(opt1);
 
-                let lat = parseFloat(unit.latitude);
-                let lng = parseFloat(unit.longitude);
+                // Si l'opérateur a déplacé manuellement cette unité, on garde cette position prioritaire
+                let lat = manualPositions[unitId] ? manualPositions[unitId].lat : parseFloat(unit.latitude);
+                let lng = manualPositions[unitId] ? manualPositions[unitId].lng : parseFloat(unit.longitude);
+
                 let status = unit.status || 'INDISPONIBLE';
                 let badgeColor = getStatusColor(status);
 
                 if (!isNaN(lat) && !isNaN(lng)) {
-                    // Design de l'épingle : bloc carré avec le texte au-dessus et une petite flèche de pointage en bas
                     const pinHtml = `
                         <div style="display: flex; flex-direction: column; align-items: center; filter: drop-shadow(0px 3px 6px rgba(0,0,0,0.6)); cursor: grab;">
                             <div style="background-color: ${badgeColor}; color: #fff; padding: 6px 10px; border-radius: 6px; font-weight: bold; font-size: 12px; border: 2px solid #fff; white-space: nowrap; letter-spacing: 0.5px;">
@@ -176,7 +178,7 @@
                         className: 'custom-tactical-pin',
                         html: pinHtml,
                         iconSize: [80, 45],
-                        iconAnchor: [40, 42] // Ancré précisément sur la pointe de la flèche en bas
+                        iconAnchor: [40, 42]
                     });
 
                     if (markers[unitId]) {
@@ -187,8 +189,11 @@
                         const marker = L.marker([lat, lng], { icon: customIcon, draggable: true }).addTo(map)
                             .bindPopup(`<b>Unité : ${unitId}</b><br>Glissez l'épingle pour la replacer.`);
 
+                        // Événement de glisser-déposer : mémorise la position pour qu'elle ne bouge plus toute seule
                         marker.on('dragend', function(event) {
                             const newPos = event.target.getLatLng();
+                            manualPositions[unitId] = { lat: newPos.lat, lng: newPos.lng };
+
                             db.ref(`units/${unitId}`).update({
                                 latitude: newPos.lat,
                                 longitude: newPos.lng,
