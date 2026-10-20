@@ -57,7 +57,7 @@
         </div>
 
         <div class="info-box">
-            📍 <strong>Position par défaut :</strong> 14 rue Roger Salengro, Fresnes.<br>Vous pouvez glisser l'épingle pour la repositionner.
+            📍 <strong>Position par défaut :</strong> Rue Roger Salengro, Fresnes.<br>Vous pouvez glisser l'épingle pour la repositionner.
         </div>
 
         <hr style="border-color: #444;">
@@ -99,9 +99,9 @@
         }
         const db = firebase.database();
 
-        // Coordonnées exactes du 14 rue Roger Salengro, 94260 Fresnes
-        const DEFAULT_LAT = 48.75498;
-        const DEFAULT_LNG = 2.32422;
+        // Coordonnées ajustées exactement sur l'emplacement de la pastille 03 (Rue Roger Salengro)
+        const DEFAULT_LAT = 48.7563;
+        const DEFAULT_LNG = 2.3215;
 
         const map = L.map('map').setView([DEFAULT_LAT, DEFAULT_LNG], 15);
 
@@ -162,9 +162,22 @@
                     opt1.value = unitId; opt1.textContent = unitId;
                     targetSelect.appendChild(opt1);
 
-                    // Position prioritaire : Position manuelle > GPS Mobile > Adresse par défaut (14 rue Roger Salengro)
-                    let lat = manualPositions[unitId] ? manualPositions[unitId].lat : (parseFloat(unit.latitude) || DEFAULT_LAT);
-                    let lng = manualPositions[unitId] ? manualPositions[unitId].lng : (parseFloat(unit.longitude) || DEFAULT_LNG);
+                    // Prise en compte de la position : Position Manuelle > GPS Mobile (si différent de l'ancien bug) > Adresse par défaut ajustée
+                    let lat = manualPositions[unitId] ? manualPositions[unitId].lat : DEFAULT_LAT;
+                    let lng = manualPositions[unitId] ? manualPositions[unitId].lng : DEFAULT_LNG;
+
+                    // Si l'unité a des coordonnées valides et qu'elle n'est pas encore positionnée manuellement
+                    if (!manualPositions[unitId] && unit.latitude && unit.longitude) {
+                        const parsedLat = parseFloat(unit.latitude);
+                        const parsedLng = parseFloat(unit.longitude);
+                        if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
+                            // Si ce n'est pas l'ancienne valeur erronée 48.7538, 2.3218
+                            if (Math.abs(parsedLat - 48.7538) > 0.001 || Math.abs(parsedLng - 2.3218) > 0.001) {
+                                lat = parsedLat;
+                                lng = parsedLng;
+                            }
+                        }
+                    }
 
                     let status = unit.status || 'INDISPONIBLE';
                     let badgeColor = getStatusColor(status);
@@ -225,10 +238,8 @@
                     const cardDiv = document.createElement('div');
                     cardDiv.className = `card ${cardClass}`;
                     
-                    let gpsHtml = (!isNaN(lat) && !isNaN(lng)) 
-                        ? `<p style="font-size: 11px; margin-top: 4px; color: #4caf50;">GPS : ${lat.toFixed(4)}, ${lng.toFixed(4)}</p>
-                           <button class="btn-locate" onclick="centerMapOnUnit(${lat}, ${lng}, '${unitId}')">📍 Centrer sur la carte</button>`
-                        : `<p style="font-size: 11px; margin-top: 4px; color: #ff9800;">GPS : En attente...</p>`;
+                    let gpsHtml = `<p style="font-size: 11px; margin-top: 4px; color: #4caf50;">GPS : ${lat.toFixed(4)}, ${lng.toFixed(4)}</p>
+                       <button class="btn-locate" onclick="centerMapOnUnit(${lat}, ${lng}, '${unitId}')">📍 Centrer sur la carte</button>`;
 
                     cardDiv.innerHTML = `
                         <h3>${unitId}</h3>
@@ -277,7 +288,7 @@
                 author: 'Opérateur PC'
             });
 
-            alert(`Ordre de mission transmis à ${unitId} !`);
+            alert(`Ordre de mission transmitted à ${unitId} !`);
             document.getElementById('mission-title').value = '';
             document.getElementById('mission-location').value = '';
         }
