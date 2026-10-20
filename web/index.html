@@ -33,9 +33,14 @@
         #map-container { flex: 1; height: 100vh; position: relative; display: block; }
         #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
 
-        /* Curseur de visée lorsque le mode radio est actif */
-        .leaflet-container.crosshair-cursor {
-            cursor: crosshair !important;
+        /* Écran de visée transparent qui s'active par-dessus la carte en mode radio */
+        #map-click-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 9999;
+            cursor: crosshair;
+            display: none;
+            background: rgba(0, 255, 204, 0.05);
         }
 
         #main-courante { width: 380px; min-width: 380px; background: #222230; padding: 15px; border-left: 2px solid #333; display: flex; flex-direction: column; z-index: 10; }
@@ -79,6 +84,8 @@
 
     <div id="map-container">
         <div id="map"></div>
+        <!-- Couche de capture des clics radio -->
+        <div id="map-click-overlay" onclick="handleMapOverlayClick(event)"></div>
     </div>
 
     <div id="main-courante">
@@ -122,28 +129,34 @@
         const markers = {};
         let radioRepositionMode = false;
 
-        // Gestionnaire de clic global sur la carte Leaflet
-        map.on('click', function(e) {
+        // Gestionnaire de clic direct sur la couche transparente positionnée au-dessus de la carte
+        function handleMapOverlayClick(e) {
             if (!radioRepositionMode) return;
 
             const unitId = document.getElementById('radio-unit').value;
             if (!unitId) {
-                alert("⚠️ Veuillez d'abord sélectionner une unité dans le menu déroulant.");
+                alert("⚠️ Veuillez d'abord sélectionner une unité.");
                 toggleRadioMode();
                 return;
             }
 
-            const lat = e.latlng.lat;
-            const lng = e.latlng.lng;
+            // Conversion des coordonnées écran du clic en coordonnées géographiques Leaflet (lat/lng)
+            const rect = document.getElementById('map-container').getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const latlng = map.containerPointToLatLng([x, y]);
 
-            // Mise à jour immédiate dans Firebase
+            const lat = latlng.lat;
+            const lng = latlng.lng;
+
+            // Mise à jour de Firebase
             db.ref(`units/${unitId}`).update({
                 latitude: lat,
                 longitude: lng,
                 derniere_maj: firebase.database.ServerValue.timestamp
             });
 
-            // Enregistrement dans la main courante
+            // Ajout dans la main courante
             db.ref('mains_courantes').push({
                 message: `RADIO -> Repositionnement de ${unitId} à (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
                 timestamp: Date.now(),
@@ -152,7 +165,7 @@
 
             alert(`✅ Picto de l'unité ${unitId} déplacé avec succès !`);
             toggleRadioMode();
-        });
+        }
 
         function toggleRadioMode() {
             const unitId = document.getElementById('radio-unit').value;
@@ -165,22 +178,22 @@
             const box = document.getElementById('radio-box-container');
             const btn = document.getElementById('btn-toggle-radio');
             const statusText = document.getElementById('radio-status-text');
-            const mapContainer = document.getElementById('map');
+            const overlay = document.getElementById('map-click-overlay');
 
             if (radioRepositionMode) {
                 box.classList.add('radio-mode-active');
                 btn.style.background = '#ff2222';
                 btn.textContent = "Annuler le repositionnement";
-                statusText.textContent = "👉 MODE ACTIF : Cliquez sur la carte.";
+                statusText.textContent = "👉 MODE ACTIF : Cliquez n'importe où sur la carte.";
                 statusText.style.color = "#00ffcc";
-                mapContainer.classList.add('crosshair-cursor');
+                overlay.style.display = 'block'; // Active la couche de capture
             } else {
                 box.classList.remove('radio-mode-active');
                 btn.style.background = '#0088ff';
                 btn.textContent = "Activer le clic sur la carte";
                 statusText.textContent = "Sélectionnez une unité puis cliquez sur le bouton.";
                 statusText.style.color = "#aaa";
-                mapContainer.classList.remove('crosshair-cursor');
+                overlay.style.display = 'none'; // Désactive la couche
             }
         }
 
