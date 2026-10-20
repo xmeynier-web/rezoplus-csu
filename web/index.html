@@ -24,11 +24,10 @@
         .card.hors_service { border-left-color: #777777 !important; background: #222226 !important; opacity: 0.7; }
 
         .dispatch-box, .radio-box { background: #262638; padding: 12px; border-radius: 8px; border: 1px solid #444; display: flex; flex-direction: column; gap: 8px; }
-        .dispatch-box input, .dispatch-box select, .radio-box select, .radio-box button { padding: 8px; border-radius: 4px; border: none; background: #1a1a24; color: #fff; }
+        .dispatch-box input, .dispatch-box select, .radio-box button { padding: 8px; border-radius: 4px; border: none; background: #1a1a24; color: #fff; }
         .dispatch-box button { background: #ff8800; color: #fff; cursor: pointer; font-weight: bold; }
-        .radio-box button { background: #0088ff; color: #fff; cursor: pointer; font-weight: bold; }
         
-        .radio-mode-active { border: 2px dashed #00ffcc !important; background: #103b35 !important; }
+        .info-box { background: #262638; padding: 10px; border-radius: 8px; border: 1px solid #0088ff; font-size: 12px; color: #00ffcc; text-align: center; }
 
         #map-container { flex: 1; height: 100vh; position: relative; display: block; }
         #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
@@ -38,6 +37,19 @@
 
         .btn-locate { background: #0088ff; color: #fff; border: none; padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-top: 6px; font-weight: bold; }
         .btn-locate:hover { background: #0066cc; }
+
+        /* Style des pastilles sur la carte Leaflet */
+        .unit-badge {
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 11px;
+            color: #fff;
+            text-align: center;
+            border: 2px solid #fff;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+            white-space: nowrap;
+        }
 
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
     </style>
@@ -57,13 +69,8 @@
             <button onclick="sendMission()">Transmettre l'ordre de mission</button>
         </div>
 
-        <div class="radio-box" id="radio-box-container">
-            <h3>📍 Repositionnement Radio</h3>
-            <select id="radio-unit" onchange="onRadioUnitSelectChange(this)">
-                <option value="">Sélectionner une unité à déplacer...</option>
-            </select>
-            <button id="btn-toggle-radio" onclick="toggleRadioMode()">Activer le clic sur la carte</button>
-            <span id="radio-status-text" style="font-size: 11px; color: #aaa; text-align: center;">Sélectionnez une unité puis cliquez sur le bouton.</span>
+        <div class="info-box">
+            💡 <strong>Astuce Radio :</strong> Vous pouvez <u>glisser-déposer</u> la pastille nominative d'une unité sur la carte pour la replacer suite à un compte-rendu radio.
         </div>
 
         <hr style="border-color: #444;">
@@ -72,8 +79,7 @@
         <div id="units-container"></div>
     </div>
 
-    <!-- Conteneur de la carte avec écouteur de clic direct infaillible -->
-    <div id="map-container" onclick="handleMapContainerClick(event)">
+    <div id="map-container">
         <div id="map"></div>
     </div>
 
@@ -116,73 +122,17 @@
         setTimeout(() => { map.invalidateSize(); }, 500);
 
         const markers = {};
-        let selectedRadioUnitId = "";
-        let radioRepositionMode = false;
 
-        function onRadioUnitSelectChange(selectElem) {
-            selectedRadioUnitId = selectElem.value;
-        }
-
-        function toggleRadioMode() {
-            if (!selectedRadioUnitId) {
-                alert("⚠️ Veuillez d'abord sélectionner une unité dans le menu déroulant.");
-                return;
+        function getStatusColor(status) {
+            switch(status) {
+                case 'SOS_ACTIF': return '#ff2222';
+                case 'EN_INTERVENTION': return '#ff8800';
+                case 'CONTROLE_PR': return '#009688';
+                case 'EN_PATROUILLE': return '#22bb33';
+                case 'TRANSPORT': return '#00a8ff';
+                case 'RETOUR_POSTE': return '#9c27b0';
+                default: return '#777777';
             }
-
-            radioRepositionMode = !radioRepositionMode;
-            const box = document.getElementById('radio-box-container');
-            const btn = document.getElementById('btn-toggle-radio');
-            const statusText = document.getElementById('radio-status-text');
-
-            if (radioRepositionMode) {
-                box.classList.add('radio-mode-active');
-                btn.style.background = '#ff2222';
-                btn.textContent = "Annuler le repositionnement";
-                statusText.textContent = `👉 MODE ACTIF : Cliquez sur la carte pour replacer ${selectedRadioUnitId}.`;
-                statusText.style.color = "#00ffcc";
-                map.getContainer().style.cursor = 'crosshair';
-            } else {
-                box.classList.remove('radio-mode-active');
-                btn.style.background = '#0088ff';
-                btn.textContent = "Activer le clic sur la carte";
-                statusText.textContent = "Sélectionnez une unité puis cliquez sur le bouton.";
-                statusText.style.color = "#aaa";
-                map.getContainer().style.cursor = '';
-            }
-        }
-
-        // Gestionnaire de clic direct sur le conteneur HTML de la carte (infaillible)
-        function handleMapContainerClick(e) {
-            if (!radioRepositionMode || !selectedRadioUnitId) return;
-
-            // Empêche le comportement par défaut de la carte
-            e.stopPropagation();
-
-            const rect = document.getElementById('map-container').getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-
-            // Conversion directe des coordonnées pixels en coordonnées géographiques Leaflet (lat/lng)
-            const latlng = map.containerPointToLatLng([x, y]);
-            const lat = latlng.lat;
-            const lng = latlng.lng;
-
-            // Mise à jour de Firebase
-            db.ref(`units/${selectedRadioUnitId}`).update({
-                latitude: lat,
-                longitude: lng,
-                derniere_maj: firebase.database.ServerValue.timestamp
-            });
-
-            // Consignation Main-Courante
-            db.ref('mains_courantes').push({
-                message: `RADIO -> Repositionnement manuel de ${selectedRadioUnitId} à (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
-                timestamp: Date.now(),
-                author: 'Opérateur PC'
-            });
-
-            alert(`✅ Unité ${selectedRadioUnitId} repositionnée avec succès à (${lat.toFixed(4)}, ${lng.toFixed(4)}) !`);
-            toggleRadioMode();
         }
 
         function getStatusClass(status) {
@@ -201,17 +151,14 @@
             const units = snapshot.val();
             const unitsContainer = document.getElementById('units-container');
             const targetSelect = document.getElementById('target-unit');
-            const radioSelect = document.getElementById('radio-unit');
             
             const currentSelectedTarget = targetSelect.value;
 
             unitsContainer.innerHTML = '';
             targetSelect.innerHTML = '<option value="">Sélectionner une unité...</option>';
-            radioSelect.innerHTML = '<option value="">Sélectionner une unité à déplacer...</option>';
 
             if (!units) {
                 unitsContainer.innerHTML = '<p style="font-size: 12px; color: #aaa; text-align: center; padding: 10px;">Aucune unité en ligne</p>';
-                selectedRadioUnitId = "";
                 return;
             }
 
@@ -222,23 +169,44 @@
                 opt1.value = unitId; opt1.textContent = unitId;
                 targetSelect.appendChild(opt1);
 
-                const opt2 = document.createElement('option');
-                opt2.value = unitId; opt2.textContent = unitId;
-                if (unitId === selectedRadioUnitId) {
-                    opt2.selected = true;
-                }
-                radioSelect.appendChild(opt2);
-
                 let lat = parseFloat(unit.latitude);
                 let lng = parseFloat(unit.longitude);
+                let status = unit.status || 'INDISPONIBLE';
+                let badgeColor = getStatusColor(status);
 
                 if (!isNaN(lat) && !isNaN(lng)) {
+                    // Création de l'icône personnalisée avec l'indicatif et la couleur du statut
+                    const customIcon = L.divIcon({
+                        className: 'custom-div-icon',
+                        html: `<div class="unit-badge" style="background-color: ${badgeColor};">🚓 ${unitId}</div>`,
+                        iconSize: [80, 30],
+                        iconAnchor: [40, 15]
+                    });
+
                     if (markers[unitId]) {
                         markers[unitId].setLatLng([lat, lng]);
-                        markers[unitId].setPopupContent(`<b>${unitId}</b><br>Statut: ${unit.status || 'INCONNU'}`);
+                        markers[unitId].setIcon(customIcon);
+                        markers[unitId].setPopupContent(`<b>Unité : ${unitId}</b><br>Statut: ${status}`);
                     } else {
-                        markers[unitId] = L.marker([lat, lng]).addTo(map)
-                            .bindPopup(`<b>${unitId}</b><br>Statut: ${unit.status || 'INCONNU'}`);
+                        const marker = L.marker([lat, lng], { icon: customIcon, draggable: true }).addTo(map)
+                            .bindPopup(`<b>Unité : ${unitId}</b><br>Glissez le picto pour le replacer.`);
+
+                        marker.on('dragend', function(event) {
+                            const newPos = event.target.getLatLng();
+                            db.ref(`units/${unitId}`).update({
+                                latitude: newPos.lat,
+                                longitude: newPos.lng,
+                                derniere_maj: firebase.database.ServerValue.timestamp
+                            });
+
+                            db.ref('mains_courantes').push({
+                                message: `RADIO -> Repositionnement manuel de ${unitId} à (${newPos.lat.toFixed(4)}, ${newPos.lng.toFixed(4)})`,
+                                timestamp: Date.now(),
+                                author: 'Opérateur PC'
+                            });
+                        });
+
+                        markers[unitId] = marker;
                     }
                 }
 
@@ -250,7 +218,7 @@
                     }
                 }
 
-                const cardClass = getStatusClass(unit.status);
+                const cardClass = getStatusClass(status);
                 const cardDiv = document.createElement('div');
                 cardDiv.className = `card ${cardClass}`;
                 
@@ -261,7 +229,7 @@
 
                 cardDiv.innerHTML = `
                     <h3>${unitId}</h3>
-                    <p>Statut : <strong>${unit.status || 'INDISPONIBLE'}</strong></p>
+                    <p>Statut : <strong>${status}</strong></p>
                     ${gpsHtml}
                     <p style="font-size: 11px; margin-top: 6px; color: #ccc;">${equipmentText}</p>
                 `;
@@ -269,7 +237,6 @@
             });
 
             targetSelect.value = currentSelectedTarget;
-            radioSelect.value = selectedRadioUnitId;
         });
 
         function centerMapOnUnit(lat, lng, unitId) {
