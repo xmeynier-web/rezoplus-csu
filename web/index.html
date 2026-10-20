@@ -11,33 +11,28 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
         body { display: flex; height: 100vh; background: #1a1a24; color: #fff; overflow: hidden; }
         
-        /* Sidebar Unités & Dispatch */
         #sidebar { width: 400px; background: #222230; padding: 15px; display: flex; flex-direction: column; gap: 15px; border-right: 2px solid #333; overflow-y: auto; }
         
-        /* Cartouches d'unités avec fonds et bordures ultra-visibles */
         .card { padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 8px solid #0088ff; background: #2d2d3f; transition: all 0.2s ease; }
         
         .card.sos { border-left-color: #ff2222 !important; background: #4a1515 !important; border: 1px solid #ff2222; animation: blink 1s infinite; }
         .card.intervention { border-left-color: #ff8800 !important; background: #3d2612 !important; border: 1px solid #ff8800; }
+        .card.controle_pr { border-left-color: #009688 !important; background: #00332c !important; border: 1px solid #009688; }
         .card.patrouille { border-left-color: #22bb33 !important; background: #123018 !important; }
         .card.transport { border-left-color: #00a8ff !important; background: #12223b !important; }
         .card.retour { border-left-color: #9c27b0 !important; background: #2b1638 !important; }
         .card.hors_service { border-left-color: #777777 !important; background: #222226 !important; opacity: 0.7; }
 
-        /* Module Dispatch */
         .dispatch-box { background: #262638; padding: 12px; border-radius: 8px; border: 1px solid #444; display: flex; flex-direction: column; gap: 8px; }
         .dispatch-box input, .dispatch-box select { padding: 8px; border-radius: 4px; border: none; background: #1a1a24; color: #fff; }
         .dispatch-box button { padding: 8px; background: #ff8800; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
 
-        /* Zone Carte */
         #map-container { flex: 1; position: relative; }
         #map { width: 100%; height: 100%; }
 
-        /* Main-Courante */
         #main-courante { width: 380px; background: #222230; padding: 15px; border-left: 2px solid #333; display: flex; flex-direction: column; }
         .log-entry { background: #2d2d3f; padding: 8px; border-radius: 5px; margin-bottom: 8px; font-size: 13px; border-left: 3px solid #00a8ff; }
 
-        /* Bouton centrer la carte */
         .btn-locate { background: #0088ff; color: #fff; border: none; padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-top: 6px; font-weight: bold; }
         .btn-locate:hover { background: #0066cc; }
 
@@ -46,17 +41,15 @@
 </head>
 <body>
 
-    <!-- Barre latérale : Dispatch & Unités connectées -->
     <div id="sidebar">
         <h2>Poste de Commandement</h2>
         
-        <!-- Module d'envoi en intervention (Dispatch) -->
         <div class="dispatch-box">
             <h3>📢 Dispatch Intervention</h3>
             <select id="target-unit">
                 <option value="">Sélectionner une unité...</option>
             </select>
-            <input type="text" id="mission-title" placeholder="Objet de l'intervention (ex: Vol, Contrôle...)">
+            <input type="text" id="mission-title" placeholder="Objet (ex: Vol, Contrôle...)">
             <input type="text" id="mission-location" placeholder="Adresse ou lieu-dit">
             <button onclick="sendMission()">Transmettre l'ordre de mission</button>
         </div>
@@ -73,29 +66,24 @@
         </div>
     </div>
 
-    <!-- Carte interactive -->
     <div id="map-container">
         <div id="map"></div>
     </div>
 
-    <!-- Main-Courante Informatisée (MCI) -->
     <div id="main-courante">
         <h2>Main-Courante (MCI)</h2>
         <div style="margin: 10px 0; display: flex; gap: 5px;">
-            <input type="text" id="mc-input" placeholder="Nouvel événement / observation..." style="flex: 1; padding: 8px; border-radius: 4px; border: none; background: #1a1a24; color: #fff;">
+            <input type="text" id="mc-input" placeholder="Nouvel événement..." style="flex: 1; padding: 8px; border-radius: 4px; border: none; background: #1a1a24; color: #fff;">
             <button onclick="addLog()" style="padding: 8px 12px; background: #0088ff; color: #fff; border: none; border-radius: 4px; cursor: pointer;">Consigner</button>
         </div>
         <div id="logs-container" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 6px;"></div>
     </div>
 
-    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // Configuration Firebase officielle
         const firebaseConfig = {
           apiKey: "AIzaSyCu0BK4h2hhaGV4C46C9y65rBJlnLftq3A",
           authDomain: "rezoplus-police.firebaseapp.com",
@@ -109,25 +97,22 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // Initialisation de la carte Leaflet (centrée sur Fresnes)
         const map = L.map('map').setView([48.7538, 2.3218], 14);
 
-        // Serveur Esri World Street Map (Libre, HD, sans restriction ni clé API)
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 19,
             attribution: 'Tiles &copy; Esri'
         }).addTo(map);
 
-        // Forcer l'affichage complet de la carte au chargement
         setTimeout(() => { map.invalidateSize(); }, 300);
 
         const markers = {};
 
-        // Correspondance des classes CSS selon le statut Firebase
         function getStatusClass(status) {
             switch(status) {
                 case 'SOS_ACTIF': return 'sos';
                 case 'EN_INTERVENTION': return 'intervention';
+                case 'CONTROLE_PR': return 'controle_pr';
                 case 'EN_PATROUILLE': return 'patrouille';
                 case 'TRANSPORT': return 'transport';
                 case 'RETOUR_POSTE': return 'retour';
@@ -135,7 +120,6 @@
             }
         }
 
-        // Écoute en temps réel des unités sur Firebase
         db.ref('units').on('value', (snapshot) => {
             const units = snapshot.val();
             const unitsContainer = document.getElementById('units-container');
@@ -216,11 +200,14 @@
                 return;
             }
 
-            db.ref(`units/${unitId}/active_mission`).set({
-                title: title,
-                location: location || "Non précisée",
-                timestamp: Date.now(),
-                status: "EN_ATTENTE_ACCEPTATION"
+            // Envoi de la mission et passage direct de l'unité en intervention
+            db.ref(`units/${unitId}`).update({
+                status: "EN_INTERVENTION",
+                active_mission: {
+                    title: title,
+                    location: location || "Non précisée",
+                    timestamp: Date.now()
+                }
             });
 
             db.ref('mains_courantes').push({
@@ -229,7 +216,7 @@
                 author: 'Opérateur PC'
             });
 
-            alert(`Ordre de mission transmis avec succès à l'équipage ${unitId}`);
+            alert(`Ordre de mission transmis et unité ${unitId} basculée en intervention !`);
             document.getElementById('mission-title').value = '';
             document.getElementById('mission-location').value = '';
         }
