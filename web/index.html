@@ -28,10 +28,15 @@
         .dispatch-box button { background: #ff8800; color: #fff; cursor: pointer; font-weight: bold; }
         .radio-box button { background: #0088ff; color: #fff; cursor: pointer; font-weight: bold; }
         
-        .radio-mode-active { border: 2px dashed #00ffcc !important; }
+        .radio-mode-active { border: 2px dashed #00ffcc !important; background: #103b35 !important; }
 
         #map-container { flex: 1; height: 100vh; position: relative; display: block; }
         #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
+
+        /* Curseur de visée lorsque le mode radio est actif */
+        .leaflet-container.crosshair-cursor {
+            cursor: crosshair !important;
+        }
 
         #main-courante { width: 380px; min-width: 380px; background: #222230; padding: 15px; border-left: 2px solid #333; display: flex; flex-direction: column; z-index: 10; }
         .log-entry { background: #2d2d3f; padding: 8px; border-radius: 5px; margin-bottom: 8px; font-size: 13px; border-left: 3px solid #00a8ff; }
@@ -63,7 +68,7 @@
                 <option value="">Sélectionner une unité à déplacer...</option>
             </select>
             <button id="btn-toggle-radio" onclick="toggleRadioMode()">Activer le clic sur la carte</button>
-            <span id="radio-status-text" style="font-size: 11px; color: #aaa; text-align: center;">Cliquez sur le bouton puis sur la carte pour replacer l'unité.</span>
+            <span id="radio-status-text" style="font-size: 11px; color: #aaa; text-align: center;">Sélectionnez une unité puis cliquez sur le bouton.</span>
         </div>
 
         <hr style="border-color: #444;">
@@ -105,7 +110,6 @@
         }
         const db = firebase.database();
 
-        // Initialisation de la carte Leaflet centrée sur Fresnes
         const map = L.map('map').setView([48.7538, 2.3218], 14);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -113,18 +117,18 @@
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        // Forcer le rechargement de la taille de la carte après affichage
         setTimeout(() => { map.invalidateSize(); }, 500);
 
         const markers = {};
         let radioRepositionMode = false;
 
+        // Gestionnaire de clic global sur la carte Leaflet
         map.on('click', function(e) {
             if (!radioRepositionMode) return;
 
             const unitId = document.getElementById('radio-unit').value;
             if (!unitId) {
-                alert("Veuillez d'abord sélectionner une unité dans le panneau 'Repositionnement Radio'.");
+                alert("⚠️ Veuillez d'abord sélectionner une unité dans le menu déroulant.");
                 toggleRadioMode();
                 return;
             }
@@ -132,40 +136,51 @@
             const lat = e.latlng.lat;
             const lng = e.latlng.lng;
 
+            // Mise à jour immédiate dans Firebase
             db.ref(`units/${unitId}`).update({
                 latitude: lat,
                 longitude: lng,
                 derniere_maj: firebase.database.ServerValue.timestamp
             });
 
+            // Enregistrement dans la main courante
             db.ref('mains_courantes').push({
-                message: `RADIO -> Repositionnement manuel de ${unitId} (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
+                message: `RADIO -> Repositionnement de ${unitId} à (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
                 timestamp: Date.now(),
                 author: 'Opérateur PC'
             });
 
-            alert(`Picto de l'unité ${unitId} repositionné avec succès !`);
+            alert(`✅ Picto de l'unité ${unitId} déplacé avec succès !`);
             toggleRadioMode();
         });
 
         function toggleRadioMode() {
+            const unitId = document.getElementById('radio-unit').value;
+            if (!radioRepositionMode && !unitId) {
+                alert("⚠️ Veuillez d'abord sélectionner une unité à déplacer.");
+                return;
+            }
+
             radioRepositionMode = !radioRepositionMode;
             const box = document.getElementById('radio-box-container');
             const btn = document.getElementById('btn-toggle-radio');
             const statusText = document.getElementById('radio-status-text');
+            const mapContainer = document.getElementById('map');
 
             if (radioRepositionMode) {
                 box.classList.add('radio-mode-active');
                 btn.style.background = '#ff2222';
                 btn.textContent = "Annuler le repositionnement";
-                statusText.textContent = "👉 Cliquez sur la carte à l'emplacement indiqué.";
+                statusText.textContent = "👉 MODE ACTIF : Cliquez sur la carte.";
                 statusText.style.color = "#00ffcc";
+                mapContainer.classList.add('crosshair-cursor');
             } else {
                 box.classList.remove('radio-mode-active');
                 btn.style.background = '#0088ff';
                 btn.textContent = "Activer le clic sur la carte";
-                statusText.textContent = "Cliquez sur le bouton puis sur la carte pour replacer l'unité.";
+                statusText.textContent = "Sélectionnez une unité puis cliquez sur le bouton.";
                 statusText.style.color = "#aaa";
+                mapContainer.classList.remove('crosshair-cursor');
             }
         }
 
@@ -181,7 +196,6 @@
             }
         }
 
-        // Écoute des unités Firebase
         db.ref('units').on('value', (snapshot) => {
             const units = snapshot.val();
             const unitsContainer = document.getElementById('units-container');
