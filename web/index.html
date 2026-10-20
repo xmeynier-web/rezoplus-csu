@@ -57,7 +57,7 @@
         </div>
 
         <div class="info-box">
-            💡 <strong>Radio :</strong> Glissez l'épingle sur la carte. Sa position restera fixée là où vous l'avez posée malgré les changements de statut.
+            💡 <strong>Radio :</strong> Glissez l'épingle carrée sur la carte. Sa position restera fixée là où vous l'avez posée.
         </div>
 
         <hr style="border-color: #444;">
@@ -81,7 +81,7 @@
 
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
         const firebaseConfig = {
@@ -101,15 +101,16 @@
 
         const map = L.map('map').setView([48.7538, 2.3218], 14);
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        // Utilisation du fond de carte Esri ultra-fiable
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 19,
-            attribution: '&copy; OpenStreetMap contributors'
+            attribution: 'Tiles &copy; Esri'
         }).addTo(map);
 
         setTimeout(() => { map.invalidateSize(); }, 500);
 
         const markers = {};
-        const manualPositions = {}; // Mémorise les positions forcées par l'opérateur
+        const manualPositions = {};
 
         function getStatusColor(status) {
             switch(status) {
@@ -136,108 +137,111 @@
         }
 
         db.ref('units').on('value', (snapshot) => {
-            const units = snapshot.val();
-            const unitsContainer = document.getElementById('units-container');
-            const targetSelect = document.getElementById('target-unit');
-            
-            const currentSelectedTarget = targetSelect.value;
-
-            unitsContainer.innerHTML = '';
-            targetSelect.innerHTML = '<option value="">Sélectionner une unité...</option>';
-
-            if (!units) {
-                unitsContainer.innerHTML = '<p style="font-size: 12px; color: #aaa; text-align: center; padding: 10px;">Aucune unité en ligne</p>';
-                return;
-            }
-
-            Object.keys(units).forEach((unitId) => {
-                const unit = units[unitId];
+            try {
+                const units = snapshot.val();
+                const unitsContainer = document.getElementById('units-container');
+                const targetSelect = document.getElementById('target-unit');
                 
-                const opt1 = document.createElement('option');
-                opt1.value = unitId; opt1.textContent = unitId;
-                targetSelect.appendChild(opt1);
+                const currentSelectedTarget = targetSelect.value;
 
-                // Si l'opérateur a déplacé manuellement cette unité, on garde cette position prioritaire
-                let lat = manualPositions[unitId] ? manualPositions[unitId].lat : parseFloat(unit.latitude);
-                let lng = manualPositions[unitId] ? manualPositions[unitId].lng : parseFloat(unit.longitude);
+                unitsContainer.innerHTML = '';
+                targetSelect.innerHTML = '<option value="">Sélectionner une unité...</option>';
 
-                let status = unit.status || 'INDISPONIBLE';
-                let badgeColor = getStatusColor(status);
+                if (!units) {
+                    unitsContainer.innerHTML = '<p style="font-size: 12px; color: #aaa; text-align: center; padding: 10px;">Aucune unité en ligne</p>';
+                    return;
+                }
 
-                if (!isNaN(lat) && !isNaN(lng)) {
-                    const pinHtml = `
-                        <div style="display: flex; flex-direction: column; align-items: center; filter: drop-shadow(0px 3px 6px rgba(0,0,0,0.6)); cursor: grab;">
-                            <div style="background-color: ${badgeColor}; color: #fff; padding: 6px 10px; border-radius: 6px; font-weight: bold; font-size: 12px; border: 2px solid #fff; white-space: nowrap; letter-spacing: 0.5px;">
-                                🚓 ${unitId}
+                Object.keys(units).forEach((unitId) => {
+                    const unit = units[unitId];
+                    
+                    const opt1 = document.createElement('option');
+                    opt1.value = unitId; opt1.textContent = unitId;
+                    targetSelect.appendChild(opt1);
+
+                    let lat = manualPositions[unitId] ? manualPositions[unitId].lat : parseFloat(unit.latitude);
+                    let lng = manualPositions[unitId] ? manualPositions[unitId].lng : parseFloat(unit.longitude);
+
+                    let status = unit.status || 'INDISPONIBLE';
+                    let badgeColor = getStatusColor(status);
+
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                        // Design épingle carrée avec nom de l'unité et flèche en bas
+                        const pinHtml = `
+                            <div style="display: flex; flex-direction: column; align-items: center; filter: drop-shadow(0px 3px 6px rgba(0,0,0,0.6)); cursor: grab;">
+                                <div style="background-color: ${badgeColor}; color: #fff; padding: 6px 10px; border-radius: 6px; font-weight: bold; font-size: 12px; border: 2px solid #fff; white-space: nowrap; letter-spacing: 0.5px;">
+                                    🚓 ${unitId}
+                                </div>
+                                <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid ${badgeColor}; margin-top: -1px;"></div>
                             </div>
-                            <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid ${badgeColor}; margin-top: -1px;"></div>
-                        </div>
-                    `;
+                        `;
 
-                    const customIcon = L.divIcon({
-                        className: 'custom-tactical-pin',
-                        html: pinHtml,
-                        iconSize: [80, 45],
-                        iconAnchor: [40, 42]
-                    });
-
-                    if (markers[unitId]) {
-                        markers[unitId].setLatLng([lat, lng]);
-                        markers[unitId].setIcon(customIcon);
-                        markers[unitId].setPopupContent(`<b>Unité : ${unitId}</b><br>Statut: ${status}`);
-                    } else {
-                        const marker = L.marker([lat, lng], { icon: customIcon, draggable: true }).addTo(map)
-                            .bindPopup(`<b>Unité : ${unitId}</b><br>Glissez l'épingle pour la replacer.`);
-
-                        // Événement de glisser-déposer : mémorise la position pour qu'elle ne bouge plus toute seule
-                        marker.on('dragend', function(event) {
-                            const newPos = event.target.getLatLng();
-                            manualPositions[unitId] = { lat: newPos.lat, lng: newPos.lng };
-
-                            db.ref(`units/${unitId}`).update({
-                                latitude: newPos.lat,
-                                longitude: newPos.lng,
-                                derniere_maj: firebase.database.ServerValue.timestamp
-                            });
-
-                            db.ref('mains_courantes').push({
-                                message: `RADIO -> Repositionnement manuel de ${unitId} à (${newPos.lat.toFixed(4)}, ${newPos.lng.toFixed(4)})`,
-                                timestamp: Date.now(),
-                                author: 'Opérateur PC'
-                            });
+                        const customIcon = L.divIcon({
+                            className: 'custom-tactical-pin',
+                            html: pinHtml,
+                            iconSize: [80, 45],
+                            iconAnchor: [40, 42]
                         });
 
-                        markers[unitId] = marker;
+                        if (markers[unitId]) {
+                            markers[unitId].setLatLng([lat, lng]);
+                            markers[unitId].setIcon(customIcon);
+                            markers[unitId].setPopupContent(`<b>Unité : ${unitId}</b><br>Statut: ${status}`);
+                        } else {
+                            const marker = L.marker([lat, lng], { icon: customIcon, draggable: true }).addTo(map)
+                                .bindPopup(`<b>Unité : ${unitId}</b><br>Glissez l'épingle pour la replacer.`);
+
+                            marker.on('dragend', function(event) {
+                                const newPos = event.target.getLatLng();
+                                manualPositions[unitId] = { lat: newPos.lat, lng: newPos.lng };
+
+                                db.ref(`units/${unitId}`).update({
+                                    latitude: newPos.lat,
+                                    longitude: newPos.lng,
+                                    derniere_maj: firebase.database.ServerValue.timestamp
+                                });
+
+                                db.ref('mains_courantes').push({
+                                    message: `RADIO -> Repositionnement manuel de ${unitId} à (${newPos.lat.toFixed(4)}, ${newPos.lng.toFixed(4)})`,
+                                    timestamp: Date.now(),
+                                    author: 'Opérateur PC'
+                                });
+                            });
+
+                            markers[unitId] = marker;
+                        }
                     }
-                }
 
-                let equipmentText = "Aucun matériel coché";
-                if (unit.equipment && typeof unit.equipment === 'object') {
-                    const checkedItems = Object.keys(unit.equipment).filter(key => unit.equipment[key] === true || unit.equipment[key] === 'true');
-                    if (checkedItems.length > 0) {
-                        equipmentText = "Embarqué : " + checkedItems.join(', ');
+                    let equipmentText = "Aucun matériel coché";
+                    if (unit.equipment && typeof unit.equipment === 'object') {
+                        const checkedItems = Object.keys(unit.equipment).filter(key => unit.equipment[key] === true || unit.equipment[key] === 'true');
+                        if (checkedItems.length > 0) {
+                            equipmentText = "Embarqué : " + checkedItems.join(', ');
+                        }
                     }
-                }
 
-                const cardClass = getStatusClass(status);
-                const cardDiv = document.createElement('div');
-                cardDiv.className = `card ${cardClass}`;
-                
-                let gpsHtml = (!isNaN(lat) && !isNaN(lng)) 
-                    ? `<p style="font-size: 11px; margin-top: 4px; color: #4caf50;">GPS : ${lat.toFixed(4)}, ${lng.toFixed(4)}</p>
-                       <button class="btn-locate" onclick="centerMapOnUnit(${lat}, ${lng}, '${unitId}')">📍 Centrer sur la carte</button>`
-                    : `<p style="font-size: 11px; margin-top: 4px; color: #ff9800;">GPS : En attente...</p>`;
+                    const cardClass = getStatusClass(status);
+                    const cardDiv = document.createElement('div');
+                    cardDiv.className = `card ${cardClass}`;
+                    
+                    let gpsHtml = (!isNaN(lat) && !isNaN(lng)) 
+                        ? `<p style="font-size: 11px; margin-top: 4px; color: #4caf50;">GPS : ${lat.toFixed(4)}, ${lng.toFixed(4)}</p>
+                           <button class="btn-locate" onclick="centerMapOnUnit(${lat}, ${lng}, '${unitId}')">📍 Centrer sur la carte</button>`
+                        : `<p style="font-size: 11px; margin-top: 4px; color: #ff9800;">GPS : En attente...</p>`;
 
-                cardDiv.innerHTML = `
-                    <h3>${unitId}</h3>
-                    <p>Statut : <strong>${status}</strong></p>
-                    ${gpsHtml}
-                    <p style="font-size: 11px; margin-top: 6px; color: #ccc;">${equipmentText}</p>
-                `;
-                unitsContainer.appendChild(cardDiv);
-            });
+                    cardDiv.innerHTML = `
+                        <h3>${unitId}</h3>
+                        <p>Statut : <strong>${status}</strong></p>
+                        ${gpsHtml}
+                        <p style="font-size: 11px; margin-top: 6px; color: #ccc;">${equipmentText}</p>
+                    `;
+                    unitsContainer.appendChild(cardDiv);
+                });
 
-            targetSelect.value = currentSelectedTarget;
+                targetSelect.value = currentSelectedTarget;
+            } catch (err) {
+                console.error("Erreur d'affichage des unités :", err);
+            }
         });
 
         function centerMapOnUnit(lat, lng, unitId) {
