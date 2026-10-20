@@ -72,7 +72,8 @@
         <div id="units-container"></div>
     </div>
 
-    <div id="map-container">
+    <!-- Conteneur de la carte avec écouteur de clic direct infaillible -->
+    <div id="map-container" onclick="handleMapContainerClick(event)">
         <div id="map"></div>
     </div>
 
@@ -150,30 +151,39 @@
             }
         }
 
-        // Écouteur de clic sur la carte Leaflet
-        map.on('click', function(e) {
+        // Gestionnaire de clic direct sur le conteneur HTML de la carte (infaillible)
+        function handleMapContainerClick(e) {
             if (!radioRepositionMode || !selectedRadioUnitId) return;
 
-            const lat = e.latlng.lat;
-            const lng = e.latlng.lng;
+            // Empêche le comportement par défaut de la carte
+            e.stopPropagation();
 
-            // Update Firebase
+            const rect = document.getElementById('map-container').getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            // Conversion directe des coordonnées pixels en coordonnées géographiques Leaflet (lat/lng)
+            const latlng = map.containerPointToLatLng([x, y]);
+            const lat = latlng.lat;
+            const lng = latlng.lng;
+
+            // Mise à jour de Firebase
             db.ref(`units/${selectedRadioUnitId}`).update({
                 latitude: lat,
                 longitude: lng,
                 derniere_maj: firebase.database.ServerValue.timestamp
             });
 
-            // Enregistrement Main Courante
+            // Consignation Main-Courante
             db.ref('mains_courantes').push({
                 message: `RADIO -> Repositionnement manuel de ${selectedRadioUnitId} à (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
                 timestamp: Date.now(),
                 author: 'Opérateur PC'
             });
 
-            alert(`✅ Unité ${selectedRadioUnitId} repositionnée avec succès !`);
+            alert(`✅ Unité ${selectedRadioUnitId} repositionnée avec succès à (${lat.toFixed(4)}, ${lng.toFixed(4)}) !`);
             toggleRadioMode();
-        });
+        }
 
         function getStatusClass(status) {
             switch(status) {
