@@ -23,9 +23,12 @@
         .card.retour { border-left-color: #9c27b0 !important; background: #2b1638 !important; }
         .card.hors_service { border-left-color: #777777 !important; background: #222226 !important; opacity: 0.7; }
 
-        .dispatch-box { background: #262638; padding: 12px; border-radius: 8px; border: 1px solid #444; display: flex; flex-direction: column; gap: 8px; }
-        .dispatch-box input, .dispatch-box select { padding: 8px; border-radius: 4px; border: none; background: #1a1a24; color: #fff; }
-        .dispatch-box button { padding: 8px; background: #ff8800; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .dispatch-box, .radio-box { background: #262638; padding: 12px; border-radius: 8px; border: 1px solid #444; display: flex; flex-direction: column; gap: 8px; }
+        .dispatch-box input, .dispatch-box select, .radio-box select, .radio-box button { padding: 8px; border-radius: 4px; border: none; background: #1a1a24; color: #fff; }
+        .dispatch-box button { background: #ff8800; color: #fff; cursor: pointer; font-weight: bold; }
+        .radio-box button { background: #0088ff; color: #fff; cursor: pointer; font-weight: bold; }
+        
+        .radio-mode-active { border: 2px dashed #00ffcc !important; }
 
         #map-container { flex: 1; position: relative; }
         #map { width: 100%; height: 100%; }
@@ -44,6 +47,7 @@
     <div id="sidebar">
         <h2>Poste de Commandement</h2>
         
+        <!-- Dispatch Mission -->
         <div class="dispatch-box">
             <h3>📢 Dispatch Intervention</h3>
             <select id="target-unit">
@@ -54,16 +58,20 @@
             <button onclick="sendMission()">Transmettre l'ordre de mission</button>
         </div>
 
+        <!-- Repositionnement Radio -->
+        <div class="radio-box" id="radio-box-container">
+            <h3>📍 Repositionnement Radio</h3>
+            <select id="radio-unit">
+                <option value="">Sélectionner une unité à déplacer...</option>
+            </select>
+            <button id="btn-toggle-radio" onclick="toggleRadioMode()">Activer le clic sur la carte</button>
+            <span id="radio-status-text" style="font-size: 11px; color: #aaa; text-align: center;">Cliquez sur le bouton puis sur la carte pour replacer l'unité.</span>
+        </div>
+
         <hr style="border-color: #444;">
 
         <h2>Unités en Ligne</h2>
-        <div id="units-container">
-            <div class="card patrouille">
-                <h3>ALPHA-1 (Système)</h3>
-                <p>Statut : <strong>EN ATTENTE</strong></p>
-                <p style="font-size: 11px; margin-top: 4px; color: #aaa;">Connexion Firebase active...</p>
-            </div>
-        </div>
+        <div id="units-container"></div>
     </div>
 
     <div id="map-container">
@@ -107,6 +115,60 @@
         setTimeout(() => { map.invalidateSize(); }, 300);
 
         const markers = {};
+        let radioRepositionMode = false;
+
+        // Gestion du clic sur la carte pour repositionner manuellement une unité suite à un compte-rendu radio
+        map.on('click', function(e) {
+            if (!radioRepositionMode) return;
+
+            const unitId = document.getElementById('radio-unit').value;
+            if (!unitId) {
+                alert("Veuillez d'abord sélectionner une unité dans le panneau 'Repositionnement Radio'.");
+                toggleRadioMode();
+                return;
+            }
+
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+
+            // Mise à jour de la position dans Firebase
+            db.ref(`units/${unitId}`).update({
+                latitude: lat,
+                longitude: lng,
+                derniere_maj: firebase.database.ServerValue.timestamp
+            });
+
+            // Consignation dans la main courante
+            db.ref('mains_courantes').push({
+                message: `RADIO -> Repositionnement manuel de ${unitId} sur le terrain (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
+                timestamp: Date.now(),
+                author: 'Opérateur PC'
+            });
+
+            alert(`Picto de l'unité ${unitId} repositionné avec succès sur la carte !`);
+            toggleRadioMode(); // Désactivation du mode après le clic
+        });
+
+        function toggleRadioMode() {
+            radioRepositionMode = !radioRepositionMode;
+            const box = document.getElementById('radio-box-container');
+            const btn = document.getElementById('btn-toggle-radio');
+            const statusText = document.getElementById('radio-status-text');
+
+            if (radioRepositionMode) {
+                box.classList.add('radio-mode-active');
+                btn.style.background = '#ff2222';
+                btn.textContent = "Annuler le repositionnement";
+                statusText.textContent = "👉 Mode actif : Cliquez sur la carte à l'emplacement indiqué par la radio.";
+                statusText.style.color = "#00ffcc";
+            } else {
+                box.classList.remove('radio-mode-active');
+                btn.style.background = '#0088ff';
+                btn.textContent = "Activer le clic sur la carte";
+                statusText.textContent = "Cliquez sur le bouton puis sur la carte pour replacer l'unité.";
+                statusText.style.color = "#aaa";
+            }
+        }
 
         function getStatusClass(status) {
             switch(status) {
@@ -124,20 +186,28 @@
             const units = snapshot.val();
             const unitsContainer = document.getElementById('units-container');
             const targetSelect = document.getElementById('target-unit');
+            const radioSelect = document.getElementById('radio-unit');
             
-            const currentSelected = targetSelect.value;
+            const currentSelectedTarget = targetSelect.value;
+            const currentSelectedRadio = radioSelect.value;
+
             unitsContainer.innerHTML = '';
             targetSelect.innerHTML = '<option value="">Sélectionner une unité...</option>';
+            radioSelect.innerHTML = '<option value="">Sélectionner une unité à déplacer...</option>';
 
             if (!units) return;
 
             Object.keys(units).forEach((unitId) => {
                 const unit = units[unitId];
                 
-                const option = document.createElement('option');
-                option.value = unitId;
-                option.textContent = unitId;
-                targetSelect.appendChild(option);
+                // Remplissage des menus déroulants
+                const opt1 = document.createElement('option');
+                opt1.value = unitId; opt1.textContent = unitId;
+                targetSelect.appendChild(opt1);
+
+                const opt2 = document.createElement('option');
+                opt2.value = unitId; opt2.textContent = unitId;
+                radioSelect.appendChild(opt2);
 
                 let lat = parseFloat(unit.latitude);
                 let lng = parseFloat(unit.longitude);
@@ -152,97 +222,13 @@
                     }
                 }
 
-                let equipmentText = "Matériel non renseigné";
+                let equipmentText = "Aucun matériel coché";
                 if (unit.equipment && typeof unit.equipment === 'object') {
                     const checkedItems = Object.keys(unit.equipment).filter(key => unit.equipment[key] === true || unit.equipment[key] === 'true');
                     if (checkedItems.length > 0) {
                         equipmentText = "Embarqué : " + checkedItems.join(', ');
-                    } else {
-                        equipmentText = "Aucun matériel coché";
                     }
                 }
 
                 const cardClass = getStatusClass(unit.status);
-                const cardDiv = document.createElement('div');
-                cardDiv.className = `card ${cardClass}`;
-                
-                let gpsHtml = (!isNaN(lat) && !isNaN(lng)) 
-                    ? `<p style="font-size: 11px; margin-top: 4px; color: #4caf50;">GPS : ${lat.toFixed(4)}, ${lng.toFixed(4)}</p>
-                       <button class="btn-locate" onclick="centerMapOnUnit(${lat}, ${lng}, '${unitId}')">📍 Centrer sur la carte</button>`
-                    : `<p style="font-size: 11px; margin-top: 4px; color: #ff9800;">GPS : En attente de position...</p>`;
-
-                cardDiv.innerHTML = `
-                    <h3>${unitId}</h3>
-                    <p>Statut : <strong>${unit.status || 'INDISPONIBLE'}</strong></p>
-                    ${gpsHtml}
-                    <p style="font-size: 11px; margin-top: 6px; color: #ccc;">${equipmentText}</p>
-                `;
-                unitsContainer.appendChild(cardDiv);
-            });
-
-            targetSelect.value = currentSelected;
-        });
-
-        function centerMapOnUnit(lat, lng, unitId) {
-            map.setView([lat, lng], 16, { animate: true });
-            if (markers[unitId]) {
-                markers[unitId].openPopup();
-            }
-        }
-
-        function sendMission() {
-            const unitId = document.getElementById('target-unit').value;
-            const title = document.getElementById('mission-title').value;
-            const location = document.getElementById('mission-location').value;
-
-            if (!unitId || !title) {
-                alert("Veuillez sélectionner une unité et indiquer l'objet de l'intervention.");
-                return;
-            }
-
-            // Envoi de la mission et passage direct de l'unité en intervention
-            db.ref(`units/${unitId}`).update({
-                status: "EN_INTERVENTION",
-                active_mission: {
-                    title: title,
-                    location: location || "Non précisée",
-                    timestamp: Date.now()
-                }
-            });
-
-            db.ref('mains_courantes').push({
-                message: `DISPATCH -> ${unitId} : ${title} (${location})`,
-                timestamp: Date.now(),
-                author: 'Opérateur PC'
-            });
-
-            alert(`Ordre de mission transmis et unité ${unitId} basculée en intervention !`);
-            document.getElementById('mission-title').value = '';
-            document.getElementById('mission-location').value = '';
-        }
-
-        function addLog() {
-            const input = document.getElementById('mc-input');
-            if (!input.value) return;
-
-            db.ref('mains_courantes').push({
-                message: input.value,
-                timestamp: Date.now(),
-                author: 'Opérateur PC'
-            });
-            input.value = '';
-        }
-
-        db.ref('mains_courantes').on('child_added', (snapshot) => {
-            const log = snapshot.val();
-            const time = new Date(log.timestamp).toLocaleTimeString();
-            
-            const logsContainer = document.getElementById('logs-container');
-            const logDiv = document.createElement('div');
-            logDiv.className = 'log-entry';
-            logDiv.innerHTML = `<strong>[${time}]</strong> ${log.message}`;
-            logsContainer.prepend(logDiv);
-        });
-    </script>
-</body>
-</html>
+                const cardDiv = document.createElement('div
