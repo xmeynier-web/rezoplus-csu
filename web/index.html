@@ -23,9 +23,9 @@
         .card.retour { border-left-color: #9c27b0 !important; background: #2b1638 !important; }
         .card.hors_service { border-left-color: #777777 !important; background: #222226 !important; opacity: 0.7; }
 
-        .dispatch-box, .radio-box { background: #262638; padding: 12px; border-radius: 8px; border: 1px solid #444; display: flex; flex-direction: column; gap: 8px; }
-        .dispatch-box input, .dispatch-box select, .radio-box button { padding: 8px; border-radius: 4px; border: none; background: #1a1a24; color: #fff; }
-        .dispatch-box button { background: #ff8800; color: #fff; cursor: pointer; font-weight: bold; }
+        .dispatch-box { background: #262638; padding: 12px; border-radius: 8px; border: 1px solid #444; display: flex; flex-direction: column; gap: 8px; }
+        .dispatch-box input, .dispatch-box select { padding: 8px; border-radius: 4px; border: none; background: #1a1a24; color: #fff; }
+        .dispatch-box button { background: #ff8800; color: #fff; cursor: pointer; font-weight: bold; padding: 8px; border-radius: 4px; border: none; }
         
         .info-box { background: #262638; padding: 10px; border-radius: 8px; border: 1px solid #0088ff; font-size: 12px; color: #00ffcc; text-align: center; }
 
@@ -37,19 +37,6 @@
 
         .btn-locate { background: #0088ff; color: #fff; border: none; padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-top: 6px; font-weight: bold; }
         .btn-locate:hover { background: #0066cc; }
-
-        /* Style des pastilles sur la carte Leaflet */
-        .unit-badge {
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-weight: bold;
-            font-size: 11px;
-            color: #fff;
-            text-align: center;
-            border: 2px solid #fff;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.5);
-            white-space: nowrap;
-        }
 
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
     </style>
@@ -70,7 +57,7 @@
         </div>
 
         <div class="info-box">
-            💡 <strong>Astuce Radio :</strong> Vous pouvez <u>glisser-déposer</u> la pastille nominative d'une unité sur la carte pour la replacer suite à un compte-rendu radio.
+            💡 <strong>Astuce Radio :</strong> Vous pouvez <u>glisser-déposer</u> directement l'épingle carrée d'une unité sur la carte pour la replacer suite à un compte-rendu radio.
         </div>
 
         <hr style="border-color: #444;">
@@ -175,12 +162,21 @@
                 let badgeColor = getStatusColor(status);
 
                 if (!isNaN(lat) && !isNaN(lng)) {
-                    // Création de l'icône personnalisée avec l'indicatif et la couleur du statut
+                    // Design de l'épingle : bloc carré avec le texte au-dessus et une petite flèche de pointage en bas
+                    const pinHtml = `
+                        <div style="display: flex; flex-direction: column; align-items: center; filter: drop-shadow(0px 3px 6px rgba(0,0,0,0.6)); cursor: grab;">
+                            <div style="background-color: ${badgeColor}; color: #fff; padding: 6px 10px; border-radius: 6px; font-weight: bold; font-size: 12px; border: 2px solid #fff; white-space: nowrap; letter-spacing: 0.5px;">
+                                🚓 ${unitId}
+                            </div>
+                            <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid ${badgeColor}; margin-top: -1px;"></div>
+                        </div>
+                    `;
+
                     const customIcon = L.divIcon({
-                        className: 'custom-div-icon',
-                        html: `<div class="unit-badge" style="background-color: ${badgeColor};">🚓 ${unitId}</div>`,
-                        iconSize: [80, 30],
-                        iconAnchor: [40, 15]
+                        className: 'custom-tactical-pin',
+                        html: pinHtml,
+                        iconSize: [80, 45],
+                        iconAnchor: [40, 42] // Ancré précisément sur la pointe de la flèche en bas
                     });
 
                     if (markers[unitId]) {
@@ -189,7 +185,7 @@
                         markers[unitId].setPopupContent(`<b>Unité : ${unitId}</b><br>Statut: ${status}`);
                     } else {
                         const marker = L.marker([lat, lng], { icon: customIcon, draggable: true }).addTo(map)
-                            .bindPopup(`<b>Unité : ${unitId}</b><br>Glissez le picto pour le replacer.`);
+                            .bindPopup(`<b>Unité : ${unitId}</b><br>Glissez l'épingle pour la replacer.`);
 
                         marker.on('dragend', function(event) {
                             const newPos = event.target.getLatLng();
