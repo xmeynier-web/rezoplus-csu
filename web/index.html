@@ -13,7 +13,6 @@
         
         #sidebar { width: 420px; min-width: 420px; background: #222230; padding: 15px; display: flex; flex-direction: column; gap: 15px; border-right: 2px solid #333; overflow-y: auto; z-index: 10; }
         
-        /* En-tête fixe et harmonisé */
         .header-title { display: flex; align-items: center; gap: 15px; padding-bottom: 5px; }
         .header-title img { height: 84px; width: auto; object-fit: contain; }
         .header-title h2 { font-size: 20px; font-weight: bold; color: #fff; margin: 0; line-height: 1.2; }
@@ -36,7 +35,6 @@
 
         #main-courante { width: 380px; min-width: 380px; background: #222230; padding: 15px; border-left: 2px solid #333; display: flex; flex-direction: column; z-index: 10; }
         
-        /* Cartouches de la main-courante intégralement colorées */
         .log-entry { 
             padding: 10px; 
             border-radius: 6px; 
@@ -128,8 +126,6 @@
         });
 
         const markers = {};
-        const unitStatusCache = {}; // Cache local strict anti-doublon
-        let initialLoadDone = false;
 
         function getStatusColor(status) {
             switch(status) {
@@ -155,23 +151,16 @@
             }
         }
 
-        // Surveillance unique des déconnexions
+        // Nettoyage des marqueurs de la carte lorsqu'une unité se déconnecte
         db.ref('units').on('child_removed', (snapshot) => {
             const unitId = snapshot.key;
-            db.ref('mains_courantes').push({
-                message: `DÉCONNEXION -> Fin de service / Déconnexion : ${unitId}`,
-                timestamp: Date.now(),
-                author: 'Système',
-                statusColor: '#777777'
-            });
-            delete unitStatusCache[unitId];
             if (markers[unitId]) {
                 map.removeLayer(markers[unitId]);
                 delete markers[unitId];
             }
         });
 
-        // Synchronisation principale et gestion anti-doublon des statuts
+        // Mise à jour visuelle des unités sur le tableau de bord et la carte
         db.ref('units').on('value', (snapshot) => {
             try {
                 const units = snapshot.val();
@@ -185,7 +174,6 @@
 
                 if (!units) {
                     unitsContainer.innerHTML = '<p style="font-size: 12px; color: #aaa; text-align: center; padding: 10px;">Aucune unité en ligne</p>';
-                    initialLoadDone = true;
                     return;
                 }
 
@@ -199,34 +187,7 @@
                     let status = unit.status || 'INDISPONIBLE';
                     let badgeColor = getStatusColor(status);
 
-                    // Détection rigoureuse des changements de statut et connexions sans doublon
-                    if (unitStatusCache[unitId] === undefined) {
-                        unitStatusCache[unitId] = status;
-                        if (initialLoadDone) {
-                            db.ref('mains_courantes').push({
-                                message: `CONNEXION -> Allumage application : ${unitId} | Statut initial : ${status}`,
-                                timestamp: Date.now(),
-                                author: 'Système',
-                                statusColor: badgeColor
-                            });
-                        }
-                    } else if (unitStatusCache[unitId] !== status) {
-                        unitStatusCache[unitId] = status;
-
-                        let logPrefix = "STATUT";
-                        if (status === 'SOS_ACTIF') {
-                            logPrefix = "🚨 DÉCLENCHEMENT SOS 🚨";
-                        }
-
-                        db.ref('mains_courantes').push({
-                            message: `${logPrefix} -> Indicatif : ${unitId} | Statut : ${status}`,
-                            timestamp: Date.now(),
-                            author: 'Système',
-                            statusColor: badgeColor
-                        });
-                    }
-
-                    // Récupération des coordonnées GPS persistées dans Firebase
+                    // Position GPS (priorité à la base Firebase)
                     let lat = DEFAULT_LAT;
                     let lng = DEFAULT_LNG;
 
@@ -263,7 +224,7 @@
                         const marker = L.marker([lat, lng], { icon: customIcon, draggable: true }).addTo(map)
                             .bindPopup(`<b>Unité : ${unitId}</b><br>Glissez l'épingle pour la replacer.`);
 
-                        // Sauvegarde persistante de la position après déplacement (Drag & Drop)
+                        // Sauvegarde de la position déplacée
                         marker.on('dragend', function(event) {
                             const newPos = event.target.getLatLng();
 
@@ -275,7 +236,7 @@
 
                             db.ref('mains_courantes').push({
                                 message: `RADIO -> Repositionnement manuel de ${unitId} à (${newPos.lat.toFixed(4)}, ${newPos.lng.toFixed(4)})`,
-                                timestamp: Date.now(),
+                                timestamp: firebase.database.ServerValue.timestamp,
                                 author: 'Opérateur PC',
                                 statusColor: '#00a8ff'
                             });
@@ -309,7 +270,6 @@
                 });
 
                 targetSelect.value = currentSelectedTarget;
-                initialLoadDone = true;
             } catch (err) {
                 console.error("Erreur d'affichage des unités :", err);
             }
@@ -322,6 +282,7 @@
             }
         }
 
+        // Transmettre une mission (action propre au PC)
         function sendMission() {
             const unitId = document.getElementById('target-unit').value;
             const title = document.getElementById('mission-title').value;
@@ -337,13 +298,13 @@
                 active_mission: {
                     title: title,
                     location: location || "Non précisée",
-                    timestamp: Date.now()
+                    timestamp: firebase.database.ServerValue.timestamp
                 }
             });
 
             db.ref('mains_courantes').push({
                 message: `DISPATCH -> ${unitId} : ${title} (${location})`,
-                timestamp: Date.now(),
+                timestamp: firebase.database.ServerValue.timestamp,
                 author: 'Opérateur PC',
                 statusColor: '#ff8800'
             });
@@ -353,26 +314,27 @@
             document.getElementById('mission-location').value = '';
         }
 
+        // Ajout manuel d'une note MCI par l'opérateur
         function addLog() {
             const input = document.getElementById('mc-input');
             if (!input.value) return;
 
             db.ref('mains_courantes').push({
                 message: input.value,
-                timestamp: Date.now(),
+                timestamp: firebase.database.ServerValue.timestamp,
                 author: 'Opérateur PC',
                 statusColor: '#00a8ff'
             });
             input.value = '';
         }
 
-        // Affichage Main-Courante avec protection anti-doublon DOM par ID unique
+        // Affichage fluide et unique de la Main-Courante (MCI)
         db.ref('mains_courantes').limitToLast(50).on('child_added', (snapshot) => {
             const logId = snapshot.key;
-            if (document.getElementById(`log-${logId}`)) return; // Empêche le doublon visuel
+            if (document.getElementById(`log-${logId}`)) return;
 
             const log = snapshot.val();
-            const dateObj = new Date(log.timestamp);
+            const dateObj = new Date(log.timestamp || Date.now());
             const dateStr = dateObj.toLocaleDateString();
             const timeStr = dateObj.toLocaleTimeString();
             
@@ -381,7 +343,6 @@
             logDiv.id = `log-${logId}`;
             logDiv.className = 'log-entry';
             
-            // Application prioritaire et explicite de la couleur de fond du statut
             if (log.statusColor) {
                 logDiv.style.backgroundColor = log.statusColor;
             } else {
