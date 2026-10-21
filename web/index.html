@@ -16,7 +16,6 @@
         .header-title { display: flex; align-items: center; gap: 15px; font-size: 20px; font-weight: bold; padding-bottom: 5px; }
         .header-title img { height: 84px; width: auto; object-fit: contain; }
 
-        /* Style harmonisé pour toutes les cartes d'unités à gauche */
         .card { padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 8px solid #777777; background: #2d2d3f; transition: all 0.2s ease; }
         .card.sos { border-left-color: #ff2222 !important; background: #4a1515 !important; border: 1px solid #ff2222; animation: blink 1s infinite; }
         .card.intervention { border-left-color: #ff8800 !important; background: #2d2d3f !important; }
@@ -198,8 +197,10 @@
                     let status = unit.status || 'INDISPONIBLE';
                     let badgeColor = getStatusColor(status);
 
+                    // Gestion propre et unique des statuts pour éviter les doublons
                     if (!knownUnits.has(unitId)) {
                         knownUnits.add(unitId);
+                        previousStatuses[unitId] = status; // Mémorise l'état initial sans doubler
                         if (initialLoadDone) {
                             db.ref('mains_courantes').push({
                                 message: `CONNEXION -> Allumage application : ${unitId} | Statut initial : ${status}`,
@@ -208,8 +209,9 @@
                                 statusColor: badgeColor
                             });
                         }
-                    } 
-                    else if (previousStatuses[unitId] && previousStatuses[unitId] !== status) {
+                    } else if (previousStatuses[unitId] !== status) {
+                        // Uniquement si le statut a réellement changé par rapport à la mémoire locale
+                        previousStatuses[unitId] = status;
                         let logPrefix = "STATUT";
                         if (status === 'SOS_ACTIF') {
                             logPrefix = "🚨 DÉCLENCHEMENT SOS 🚨";
@@ -222,7 +224,6 @@
                             statusColor: badgeColor
                         });
                     }
-                    previousStatuses[unitId] = status;
 
                     let lat = manualPositions[unitId] ? manualPositions[unitId].lat : DEFAULT_LAT;
                     let lng = manualPositions[unitId] ? manualPositions[unitId].lng : DEFAULT_LNG;
