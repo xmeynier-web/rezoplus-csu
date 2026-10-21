@@ -57,7 +57,7 @@
         </div>
 
         <div class="info-box">
-            📍 <strong>Position Poste :</strong> 14 rue Roger Salengro, Fresnes.<br>Vous pouvez glisser chaque épingle pour la repositionner.
+            📍 <strong>Position Poste :</strong> 14 rue Roger Salengro, Fresnes.<br>Glissez chaque épingle pour la repositionner.
         </div>
 
         <hr style="border-color: #444;">
@@ -99,13 +99,11 @@
         }
         const db = firebase.database();
 
-        // Coordonnées exactes du repère vert 03 (Haut de la Rue Roger Salengro)
         const DEFAULT_LAT = 48.7563;
         const DEFAULT_LNG = 2.3215;
 
         const map = L.map('map').setView([DEFAULT_LAT, DEFAULT_LNG], 16);
 
-        // Utilisation du fond de carte OpenStreetMap standard ultra-stable
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '&copy; OpenStreetMap contributors'
@@ -115,6 +113,7 @@
 
         const markers = {};
         const manualPositions = {};
+        const previousStatuses = {};
 
         function getStatusColor(status) {
             switch(status) {
@@ -163,6 +162,17 @@
                     opt1.value = unitId; opt1.textContent = unitId;
                     targetSelect.appendChild(opt1);
 
+                    let status = unit.status || 'INDISPONIBLE';
+
+                    if (previousStatuses[unitId] && previousStatuses[unitId] !== status) {
+                        db.ref('mains_courantes').push({
+                            message: `STATUT -> Indicatif : ${unitId} | Statut : ${status}`,
+                            timestamp: Date.now(),
+                            author: 'Système'
+                        });
+                    }
+                    previousStatuses[unitId] = status;
+
                     let lat = manualPositions[unitId] ? manualPositions[unitId].lat : DEFAULT_LAT;
                     let lng = manualPositions[unitId] ? manualPositions[unitId].lng : DEFAULT_LNG;
 
@@ -177,7 +187,6 @@
                         }
                     }
 
-                    let status = unit.status || 'INDISPONIBLE';
                     let badgeColor = getStatusColor(status);
 
                     const pinHtml = `
@@ -303,14 +312,17 @@
             input.value = '';
         }
 
-        db.ref('mains_courantes').limitToLast(50).on('child_added', (snapshot) => {
+        // Affichage de la main-courante limité aux 35 dernières lignes
+        db.ref('mains_courantes').limitToLast(35).on('child_added', (snapshot) => {
             const log = snapshot.val();
-            const time = new Date(log.timestamp).toLocaleTimeString();
+            const dateObj = new Date(log.timestamp);
+            const dateStr = dateObj.toLocaleDateString();
+            const timeStr = dateObj.toLocaleTimeString();
             
             const logsContainer = document.getElementById('logs-container');
             const logDiv = document.createElement('div');
             logDiv.className = 'log-entry';
-            logDiv.innerHTML = `<strong>[${time}]</strong> ${log.message}`;
+            logDiv.innerHTML = `<strong>[${dateStr} - ${timeStr}]</strong> ${log.message}`;
             logsContainer.prepend(logDiv);
         });
     </script>
