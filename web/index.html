@@ -13,7 +13,6 @@
         
         #sidebar { width: 420px; min-width: 420px; background: #222230; padding: 15px; display: flex; flex-direction: column; gap: 15px; border-right: 2px solid #333; overflow-y: auto; z-index: 10; }
         
-        /* Style du titre avec logo grossi par 3 */
         .header-title { display: flex; align-items: center; gap: 15px; font-size: 20px; font-weight: bold; padding-bottom: 5px; }
         .header-title img { height: 84px; width: auto; object-fit: contain; }
 
@@ -35,7 +34,17 @@
         #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
 
         #main-courante { width: 380px; min-width: 380px; background: #222230; padding: 15px; border-left: 2px solid #333; display: flex; flex-direction: column; z-index: 10; }
-        .log-entry { background: #2d2d3f; padding: 8px; border-radius: 5px; margin-bottom: 8px; font-size: 13px; border-left: 4px solid #00a8ff; }
+        
+        .log-entry { 
+            padding: 10px; 
+            border-radius: 6px; 
+            margin-bottom: 8px; 
+            font-size: 13px; 
+            color: #ffffff; 
+            background-color: #0088ff; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            line-height: 1.4;
+        }
 
         .btn-locate { background: #0088ff; color: #fff; border: none; padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-top: 6px; font-weight: bold; }
         .btn-locate:hover { background: #0066cc; }
@@ -115,17 +124,18 @@
         const markers = {};
         const manualPositions = {};
         const previousStatuses = {};
+        const knownUnits = new Set();
         let initialLoadDone = false;
 
         function getStatusColor(status) {
             switch(status) {
-                case 'SOS_ACTIF': return '#ff2222';
-                case 'EN_INTERVENTION': return '#ff8800';
-                case 'CONTROLE_PR': return '#009688';
-                case 'EN_PATROUILLE': return '#22bb33';
-                case 'TRANSPORT': return '#00a8ff';
-                case 'RETOUR_POSTE': return '#9c27b0';
-                default: return '#777777';
+                case 'SOS_ACTIF': return '#b30000'; // Rouge alerte
+                case 'EN_INTERVENTION': return '#d96b00'; // Orange
+                case 'CONTROLE_PR': return '#00796b'; // Teal
+                case 'EN_PATROUILLE': return '#1b8a28'; // Vert
+                case 'TRANSPORT': return '#0070ba'; // Bleu
+                case 'RETOUR_POSTE': return '#6d2382'; // Violet
+                default: return '#555555'; // Gris
             }
         }
 
@@ -141,14 +151,17 @@
             }
         }
 
+        // Déconnexion
         db.ref('units').on('child_removed', (snapshot) => {
             const unitId = snapshot.key;
             db.ref('mains_courantes').push({
-                message: `DÉCONNEXION -> Fin de service / Déconnexion de l'application : ${unitId}`,
+                message: `DÉCONNEXION -> Fin de service / Déconnexion : ${unitId}`,
                 timestamp: Date.now(),
                 author: 'Système',
-                statusColor: '#777777'
+                statusColor: '#444444'
             });
+            knownUnits.delete(unitId);
+            delete previousStatuses[unitId];
             if (markers[unitId]) {
                 map.removeLayer(markers[unitId]);
                 delete markers[unitId];
@@ -181,9 +194,27 @@
                     let status = unit.status || 'INDISPONIBLE';
                     let badgeColor = getStatusColor(status);
 
-                    if (initialLoadDone && previousStatuses[unitId] && previousStatuses[unitId] !== status) {
+                    // 1. Connexion / allumage
+                    if (!knownUnits.has(unitId)) {
+                        knownUnits.add(unitId);
+                        if (initialLoadDone) {
+                            db.ref('mains_courantes').push({
+                                message: `CONNEXION -> Allumage application : ${unitId} | Statut initial : ${status}`,
+                                timestamp: Date.now(),
+                                author: 'Système',
+                                statusColor: badgeColor
+                            });
+                        }
+                    } 
+                    // 2. Changement de statut (SOS compris)
+                    else if (previousStatuses[unitId] && previousStatuses[unitId] !== status) {
+                        let logPrefix = "STATUT";
+                        if (status === 'SOS_ACTIF') {
+                            logPrefix = "🚨 DÉCLENCHEMENT SOS 🚨";
+                        }
+
                         db.ref('mains_courantes').push({
-                            message: `STATUT -> Indicatif : ${unitId} | Statut : ${status}`,
+                            message: `${logPrefix} -> Indicatif : ${unitId} | Statut : ${status}`,
                             timestamp: Date.now(),
                             author: 'Système',
                             statusColor: badgeColor
@@ -243,7 +274,7 @@
                                 message: `RADIO -> Repositionnement manuel de ${unitId} à (${newPos.lat.toFixed(4)}, ${newPos.lng.toFixed(4)})`,
                                 timestamp: Date.now(),
                                 author: 'Opérateur PC',
-                                statusColor: '#00a8ff'
+                                statusColor: '#0070ba'
                             });
                         });
 
@@ -311,7 +342,7 @@
                 message: `DISPATCH -> ${unitId} : ${title} (${location})`,
                 timestamp: Date.now(),
                 author: 'Opérateur PC',
-                statusColor: '#ff8800'
+                statusColor: '#d96b00'
             });
 
             alert(`Ordre de mission transmis à ${unitId} !`);
@@ -327,7 +358,7 @@
                 message: input.value,
                 timestamp: Date.now(),
                 author: 'Opérateur PC',
-                statusColor: '#0088ff'
+                statusColor: '#0070ba'
             });
             input.value = '';
         }
@@ -343,7 +374,7 @@
             logDiv.className = 'log-entry';
             
             if (log.statusColor) {
-                logDiv.style.borderLeftColor = log.statusColor;
+                logDiv.style.backgroundColor = log.statusColor;
             }
 
             logDiv.innerHTML = `<strong>[${dateStr} - ${timeStr}]</strong> ${log.message}`;
