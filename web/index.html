@@ -128,8 +128,7 @@
         const markers = {};
         const manualPositions = {};
         const previousStatuses = {};
-        const knownUnits = new Set();
-        let initialLoadDone = false;
+        let initialLoadCompleted = false;
 
         function getStatusColor(status) {
             switch(status) {
@@ -155,6 +154,7 @@
             }
         }
 
+        // Surveillance des suppressions (Déconnexions / Fin de service)
         db.ref('units').on('child_removed', (snapshot) => {
             const unitId = snapshot.key;
             db.ref('mains_courantes').push({
@@ -163,7 +163,6 @@
                 author: 'Système',
                 statusColor: '#777777'
             });
-            knownUnits.delete(unitId);
             delete previousStatuses[unitId];
             if (markers[unitId]) {
                 map.removeLayer(markers[unitId]);
@@ -171,6 +170,50 @@
             }
         });
 
+        // Surveillance des changements individuels (pour éviter les doublons globaux)
+        db.ref('units').on('child_changed', (snapshot) => {
+            if (!initialLoadCompleted) return;
+            const unitId = snapshot.key;
+            const unit = snapshot.val();
+            const newStatus = unit.status || 'INDISPONIBLE';
+
+            if (previousStatuses[unitId] && previousStatuses[unitId] !== newStatus) {
+                const oldStatus = previousStatuses[unitId];
+                previousStatuses[unitId] = newStatus;
+                
+                let logPrefix = "STATUT";
+                if (newStatus === 'SOS_ACTIF') {
+                    logPrefix = "🚨 DÉCLENCHEMENT SOS 🚨";
+                }
+
+                db.ref('mains_courantes').push({
+                    message: `${logPrefix} -> Indicatif : ${unitId} | Statut : ${newStatus}`,
+                    timestamp: Date.now(),
+                    author: 'Système',
+                    statusColor: getStatusColor(newStatus)
+                });
+            }
+        });
+
+        // Surveillance de l'ajout d'une nouvelle unité (Connexion / Allumage)
+        db.ref('units').on('child_added', (snapshot) => {
+            if (!initialLoadCompleted) return;
+            const unitId = snapshot.key;
+            const unit = snapshot.val();
+            const status = unit.status || 'INDISPONIBLE';
+
+            if (!previousStatuses[unitId]) {
+                previousStatuses[unitId] = status;
+                db.ref('mains_courantes').push({
+                    message: `CONNEXION -> Allumage application : ${unitId} | Statut initial : ${status}`,
+                    timestamp: Date.now(),
+                    author: 'Système',
+                    statusColor: getStatusColor(status)
+                });
+            }
+        });
+
+        // Chargement global de l'interface et de la carte
         db.ref('units').on('value', (snapshot) => {
             try {
                 const units = snapshot.val();
@@ -184,6 +227,7 @@
 
                 if (!units) {
                     unitsContainer.innerHTML = '<p style="font-size: 12px; color: #aaa; text-align: center; padding: 10px;">Aucune unité en ligne</p>';
+                    initialLoadCompleted = true;
                     return;
                 }
 
@@ -195,34 +239,10 @@
                     targetSelect.appendChild(opt1);
 
                     let status = unit.status || 'INDISPONIBLE';
-                    let badgeColor = getStatusColor(status);
-
-                    // Gestion propre et unique des statuts pour éviter les doublons
-                    if (!knownUnits.has(unitId)) {
-                        knownUnits.add(unitId);
-                        previousStatuses[unitId] = status; // Mémorise l'état initial sans doubler
-                        if (initialLoadDone) {
-                            db.ref('mains_courantes').push({
-                                message: `CONNEXION -> Allumage application : ${unitId} | Statut initial : ${status}`,
-                                timestamp: Date.now(),
-                                author: 'Système',
-                                statusColor: badgeColor
-                            });
-                        }
-                    } else if (previousStatuses[unitId] !== status) {
-                        // Uniquement si le statut a réellement changé par rapport à la mémoire locale
+                    
+                    // Mémorisation de départ sans déclencher de log en double
+                    if (!previousStatuses[unitId]) {
                         previousStatuses[unitId] = status;
-                        let logPrefix = "STATUT";
-                        if (status === 'SOS_ACTIF') {
-                            logPrefix = "🚨 DÉCLENCHEMENT SOS 🚨";
-                        }
-
-                        db.ref('mains_courantes').push({
-                            message: `${logPrefix} -> Indicatif : ${unitId} | Statut : ${status}`,
-                            timestamp: Date.now(),
-                            author: 'Système',
-                            statusColor: badgeColor
-                        });
                     }
 
                     let lat = manualPositions[unitId] ? manualPositions[unitId].lat : DEFAULT_LAT;
@@ -238,6 +258,8 @@
                             }
                         }
                     }
+
+                    let badgeColor = getStatusColor(status);
 
                     const pinHtml = `
                         <div style="display: flex; flex-direction: column; align-items: center; filter: drop-shadow(0px 3px 6px rgba(0,0,0,0.6)); cursor: grab;">
@@ -309,7 +331,7 @@
                 });
 
                 targetSelect.value = currentSelectedTarget;
-                initialLoadDone = true;
+                initialLoadCompleted = true;
             } catch (err) {
                 console.error("Erreur d'affichage des unités :", err);
             }
@@ -366,6 +388,7 @@
             input.value = '';
         }
 
+        // Affichage Main-Courante (limité à 50 entrées)
         db.ref('mains_courantes').limitToLast(50).on('child_added', (snapshot) => {
             const log = snapshot.val();
             const dateObj = new Date(log.timestamp);
