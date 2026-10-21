@@ -8,33 +8,16 @@
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
         body { display: flex; height: 100vh; width: 100vw; background: #1a1a24; color: #fff; overflow: hidden; }
         
-        /* Left Sidebar - PC Controls & Active Units */
-        #sidebar { 
-            width: 420px; 
-            min-width: 420px; 
-            background: #222230; 
-            padding: 15px; 
-            display: flex; 
-            flex-direction: column; 
-            gap: 15px; 
-            border-right: 2px solid #333; 
-            overflow-y: auto; 
-            z-index: 10; 
-        }
+        #sidebar { width: 420px; min-width: 420px; background: #222230; padding: 15px; display: flex; flex-direction: column; gap: 15px; border-right: 2px solid #333; overflow-y: auto; z-index: 10; }
         
-        .header-title { display: flex; align-items: center; gap: 15px; font-size: 18px; font-weight: bold; padding-bottom: 5px; border-bottom: 1px solid #333; }
+        /* En-tête fixe et harmonisé */
+        .header-title { display: flex; align-items: center; gap: 15px; padding-bottom: 5px; }
         .header-title img { height: 84px; width: auto; object-fit: contain; }
+        .header-title h2 { font-size: 20px; font-weight: bold; color: #fff; margin: 0; line-height: 1.2; }
 
-        .dispatch-box { background: #262638; padding: 12px; border-radius: 8px; border: 1px solid #444; display: flex; flex-direction: column; gap: 8px; }
-        .dispatch-box h3 { font-size: 15px; color: #ff8800; }
-        .dispatch-box input, .dispatch-box select { padding: 9px; border-radius: 4px; border: 1px solid #444; background: #1a1a24; color: #fff; font-size: 13px; }
-        .dispatch-box button { background: #ff8800; color: #fff; cursor: pointer; font-weight: bold; padding: 10px; border-radius: 4px; border: none; transition: background 0.2s; }
-        .dispatch-box button:hover { background: #e07700; }
-
-        /* Unit Card Layouts */
         .card { padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 8px solid #777777; background: #2d2d3f; transition: all 0.2s ease; }
         .card.sos { border-left-color: #ff2222 !important; background: #4a1515 !important; border: 1px solid #ff2222; animation: blink 1s infinite; }
         .card.intervention { border-left-color: #ff8800 !important; background: #2d2d3f !important; }
@@ -44,39 +27,38 @@
         .card.retour { border-left-color: #9c27b0 !important; background: #2d2d3f !important; }
         .card.hors_service { border-left-color: #777777 !important; background: #2d2d3f !important; opacity: 0.7; }
 
-        /* Center Map Container */
+        .dispatch-box { background: #262638; padding: 12px; border-radius: 8px; border: 1px solid #444; display: flex; flex-direction: column; gap: 8px; }
+        .dispatch-box input, .dispatch-box select { padding: 8px; border-radius: 4px; border: none; background: #1a1a24; color: #fff; }
+        .dispatch-box button { background: #ff8800; color: #fff; cursor: pointer; font-weight: bold; padding: 8px; border-radius: 4px; border: none; }
+
         #map-container { flex: 1; height: 100vh; position: relative; background: #1a1a24; }
         #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
 
-        /* Right Sidebar - Main Courante (MCI) */
         #main-courante { width: 380px; min-width: 380px; background: #222230; padding: 15px; border-left: 2px solid #333; display: flex; flex-direction: column; z-index: 10; }
-        #main-courante h2 { font-size: 18px; margin-bottom: 10px; }
         
+        /* Cartouches de la main-courante intégralement colorées */
         .log-entry { 
-            padding: 10px 12px; 
+            padding: 10px; 
             border-radius: 6px; 
             margin-bottom: 8px; 
-            font-size: 12px; 
-            color: #ffffff; 
-            background-color: #00a8ff; 
+            font-size: 13px; 
+            color: #ffffff !important; 
             box-shadow: 0 2px 4px rgba(0,0,0,0.3);
             line-height: 1.4;
-            word-wrap: break-word;
         }
 
-        .btn-locate { background: #0088ff; color: #fff; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-top: 8px; font-weight: bold; width: 100%; }
+        .btn-locate { background: #0088ff; color: #fff; border: none; padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-top: 6px; font-weight: bold; }
         .btn-locate:hover { background: #0066cc; }
 
-        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
 
-    <!-- Left Sidebar -->
     <div id="sidebar">
         <div class="header-title">
             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Logo_Police_Municipale_%28France%29.svg/1280px-Logo_Police_Municipale_%28France%29.svg.png" alt="Logo PM">
-            <div>Poste de Commandement</div>
+            <h2>Poste de Commandement</h2>
         </div>
         
         <div class="dispatch-box">
@@ -91,33 +73,28 @@
 
         <hr style="border-color: #444;">
 
-        <h3 style="font-size: 16px;">Unités en Ligne</h3>
+        <h2>Unités en Ligne</h2>
         <div id="units-container"></div>
     </div>
 
-    <!-- Center Interactive Map -->
     <div id="map-container">
         <div id="map"></div>
     </div>
 
-    <!-- Right Sidebar - Main Courante -->
     <div id="main-courante">
         <h2>Main-Courante (MCI)</h2>
-        <div style="margin-bottom: 12px; display: flex; gap: 6px;">
-            <input type="text" id="mc-input" placeholder="Nouvel événement..." style="flex: 1; padding: 8px; border-radius: 4px; border: 1px solid #444; background: #1a1a24; color: #fff; font-size: 12px;">
-            <button onclick="addManualLog()" style="padding: 8px 14px; background: #0088ff; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Consigner</button>
+        <div style="margin: 10px 0; display: flex; gap: 5px;">
+            <input type="text" id="mc-input" placeholder="Nouvel événement..." style="flex: 1; padding: 8px; border-radius: 4px; border: none; background: #1a1a24; color: #fff;">
+            <button onclick="addLog()" style="padding: 8px 12px; background: #0088ff; color: #fff; border: none; border-radius: 4px; cursor: pointer;">Consigner</button>
         </div>
-        <div id="logs-container" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column;"></div>
+        <div id="logs-container" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 6px;"></div>
     </div>
 
-    <!-- Firebase Compat Scripts -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
-    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // Firebase Configuration
         const firebaseConfig = {
           apiKey: "AIzaSyCu0BK4h2hhaGV4C46C9y65rBJlnLftq3A",
           authDomain: "rezoplus-police.firebaseapp.com",
@@ -133,11 +110,9 @@
         }
         const db = firebase.database();
 
-        // Fresnes Default Police Station Coordinates
         const DEFAULT_LAT = 48.7563;
         const DEFAULT_LNG = 2.3215;
 
-        // Leaflet Map Initialization
         const map = L.map('map', {
             center: [DEFAULT_LAT, DEFAULT_LNG],
             zoom: 16
@@ -145,19 +120,16 @@
 
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
-            attribution: '&copy; OpenStreetMap contributors'
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
         window.addEventListener('load', () => {
             setTimeout(() => { map.invalidateSize(); }, 300);
         });
 
-        // Application State Tracking Variables
         const markers = {};
-        const isDraggingMarker = {};
-        const unitStatusCache = {}; // Local memory cache to prevent duplicate status logs
-        let isInitialLoad = true;
-        const renderedLogKeys = new Set(); // Prevents duplicate log entries in DOM
+        const unitStatusCache = {}; // Cache local strict anti-doublon
+        let initialLoadDone = false;
 
         function getStatusColor(status) {
             switch(status) {
@@ -183,28 +155,15 @@
             }
         }
 
-        function formatDate(timestamp) {
-            const d = new Date(timestamp);
-            const pad = (n) => n.toString().padStart(2, '0');
-            return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} - ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-        }
-
-        // Push system logs to Main Courante in Firebase
-        function pushSystemLog(message, statusColor) {
-            db.ref('mains_courantes').push({
-                message: message,
-                timestamp: Date.now(),
-                author: 'Système',
-                statusColor: statusColor || '#00a8ff'
-            });
-        }
-
-        // Disconnection event listener
+        // Surveillance unique des déconnexions
         db.ref('units').on('child_removed', (snapshot) => {
             const unitId = snapshot.key;
-            if (!isInitialLoad) {
-                pushSystemLog(`DÉCONNEXION -> Fin de service / Déconnexion : ${unitId}`, '#777777');
-            }
+            db.ref('mains_courantes').push({
+                message: `DÉCONNEXION -> Fin de service / Déconnexion : ${unitId}`,
+                timestamp: Date.now(),
+                author: 'Système',
+                statusColor: '#777777'
+            });
             delete unitStatusCache[unitId];
             if (markers[unitId]) {
                 map.removeLayer(markers[unitId]);
@@ -212,62 +171,74 @@
             }
         });
 
-        // Single Unified Firebase Realtime Listener for Units
+        // Synchronisation principale et gestion anti-doublon des statuts
         db.ref('units').on('value', (snapshot) => {
             try {
-                const units = snapshot.val() || {};
+                const units = snapshot.val();
                 const unitsContainer = document.getElementById('units-container');
                 const targetSelect = document.getElementById('target-unit');
                 
                 const currentSelectedTarget = targetSelect.value;
-                const activeUnitKeys = Object.keys(units);
 
                 unitsContainer.innerHTML = '';
                 targetSelect.innerHTML = '<option value="">Sélectionner une unité...</option>';
 
-                if (activeUnitKeys.length === 0) {
+                if (!units) {
                     unitsContainer.innerHTML = '<p style="font-size: 12px; color: #aaa; text-align: center; padding: 10px;">Aucune unité en ligne</p>';
-                    isInitialLoad = false;
+                    initialLoadDone = true;
                     return;
                 }
 
-                activeUnitKeys.forEach((unitId) => {
+                Object.keys(units).forEach((unitId) => {
                     const unit = units[unitId];
-                    const currentStatus = unit.status || 'HORS_SERVICE';
                     
-                    // Populate Target Unit Dropdown
-                    const opt = document.createElement('option');
-                    opt.value = unitId; 
-                    opt.textContent = unitId;
-                    targetSelect.appendChild(opt);
+                    const opt1 = document.createElement('option');
+                    opt1.value = unitId; opt1.textContent = unitId;
+                    targetSelect.appendChild(opt1);
 
-                    // Strictly Log Status Changes / Connections using Cache
+                    let status = unit.status || 'INDISPONIBLE';
+                    let badgeColor = getStatusColor(status);
+
+                    // Détection rigoureuse des changements de statut et connexions sans doublon
                     if (unitStatusCache[unitId] === undefined) {
-                        unitStatusCache[unitId] = currentStatus;
-                        if (!isInitialLoad) {
-                            pushSystemLog(`CONNEXION -> Allumage application : ${unitId} | Statut initial : ${currentStatus}`, getStatusColor(currentStatus));
+                        unitStatusCache[unitId] = status;
+                        if (initialLoadDone) {
+                            db.ref('mains_courantes').push({
+                                message: `CONNEXION -> Allumage application : ${unitId} | Statut initial : ${status}`,
+                                timestamp: Date.now(),
+                                author: 'Système',
+                                statusColor: badgeColor
+                            });
                         }
-                    } else if (unitStatusCache[unitId] !== currentStatus) {
-                        unitStatusCache[unitId] = currentStatus;
+                    } else if (unitStatusCache[unitId] !== status) {
+                        unitStatusCache[unitId] = status;
+
                         let logPrefix = "STATUT";
-                        if (currentStatus === 'SOS_ACTIF') {
+                        if (status === 'SOS_ACTIF') {
                             logPrefix = "🚨 DÉCLENCHEMENT SOS 🚨";
                         }
-                        pushSystemLog(`${logPrefix} -> Indicatif : ${unitId} | Statut : ${currentStatus}`, getStatusColor(currentStatus));
+
+                        db.ref('mains_courantes').push({
+                            message: `${logPrefix} -> Indicatif : ${unitId} | Statut : ${status}`,
+                            timestamp: Date.now(),
+                            author: 'Système',
+                            statusColor: badgeColor
+                        });
                     }
 
-                    // Coordinate Parsing & Fallbacks
-                    let lat = parseFloat(unit.latitude);
-                    let lng = parseFloat(unit.longitude);
+                    // Récupération des coordonnées GPS persistées dans Firebase
+                    let lat = DEFAULT_LAT;
+                    let lng = DEFAULT_LNG;
 
-                    if (isNaN(lat) || isNaN(lng)) {
-                        lat = DEFAULT_LAT;
-                        lng = DEFAULT_LNG;
+                    if (unit.latitude !== undefined && unit.longitude !== undefined) {
+                        const parsedLat = parseFloat(unit.latitude);
+                        const parsedLng = parseFloat(unit.longitude);
+                        if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
+                            lat = parsedLat;
+                            lng = parsedLng;
+                        }
                     }
 
-                    const badgeColor = getStatusColor(currentStatus);
-
-                    // Marker Icon Construction
                     const pinHtml = `
                         <div style="display: flex; flex-direction: column; align-items: center; filter: drop-shadow(0px 3px 6px rgba(0,0,0,0.6)); cursor: grab;">
                             <div style="background-color: ${badgeColor}; color: #fff; padding: 6px 10px; border-radius: 6px; font-weight: bold; font-size: 12px; border: 2px solid #fff; white-space: nowrap; letter-spacing: 0.5px;">
@@ -284,39 +255,35 @@
                         iconAnchor: [40, 42]
                     });
 
-                    // Update Existing Map Marker or Create New
                     if (markers[unitId]) {
-                        if (!isDraggingMarker[unitId]) {
-                            markers[unitId].setLatLng([lat, lng]);
-                        }
+                        markers[unitId].setLatLng([lat, lng]);
                         markers[unitId].setIcon(customIcon);
-                        markers[unitId].setPopupContent(`<b>Unité : ${unitId}</b><br>Statut: ${currentStatus}`);
+                        markers[unitId].setPopupContent(`<b>Unité : ${unitId}</b><br>Statut: ${status}`);
                     } else {
                         const marker = L.marker([lat, lng], { icon: customIcon, draggable: true }).addTo(map)
                             .bindPopup(`<b>Unité : ${unitId}</b><br>Glissez l'épingle pour la replacer.`);
 
-                        marker.on('dragstart', () => {
-                            isDraggingMarker[unitId] = true;
-                        });
-
-                        // Persistence: Save dragged marker position to Firebase
+                        // Sauvegarde persistante de la position après déplacement (Drag & Drop)
                         marker.on('dragend', function(event) {
-                            isDraggingMarker[unitId] = false;
                             const newPos = event.target.getLatLng();
 
                             db.ref(`units/${unitId}`).update({
                                 latitude: newPos.lat,
                                 longitude: newPos.lng,
                                 derniere_maj: firebase.database.ServerValue.timestamp
-                            }).then(() => {
-                                pushSystemLog(`RADIO -> Repositionnement manuel de ${unitId} à (${newPos.lat.toFixed(4)}, ${newPos.lng.toFixed(4)})`, '#00a8ff');
+                            });
+
+                            db.ref('mains_courantes').push({
+                                message: `RADIO -> Repositionnement manuel de ${unitId} à (${newPos.lat.toFixed(4)}, ${newPos.lng.toFixed(4)})`,
+                                timestamp: Date.now(),
+                                author: 'Opérateur PC',
+                                statusColor: '#00a8ff'
                             });
                         });
 
                         markers[unitId] = marker;
                     }
 
-                    // Parse Equipment
                     let equipmentText = "Aucun matériel coché";
                     if (unit.equipment && typeof unit.equipment === 'object') {
                         const checkedItems = Object.keys(unit.equipment).filter(key => unit.equipment[key] === true || unit.equipment[key] === 'true');
@@ -325,17 +292,16 @@
                         }
                     }
 
-                    // Render Unit Card
-                    const cardClass = getStatusClass(currentStatus);
+                    const cardClass = getStatusClass(status);
                     const cardDiv = document.createElement('div');
                     cardDiv.className = `card ${cardClass}`;
                     
-                    const gpsHtml = `<p style="font-size: 11px; margin-top: 4px; color: #4caf50; font-weight: bold;">GPS : ${lat.toFixed(4)}, ${lng.toFixed(4)}</p>
+                    let gpsHtml = `<p style="font-size: 11px; margin-top: 4px; color: #4caf50;">GPS : ${lat.toFixed(4)}, ${lng.toFixed(4)}</p>
                        <button class="btn-locate" onclick="centerMapOnUnit(${lat}, ${lng}, '${unitId}')">📍 Centrer sur la carte</button>`;
 
                     cardDiv.innerHTML = `
-                        <h3 style="font-size: 15px; margin-bottom: 2px;">${unitId}</h3>
-                        <p style="font-size: 13px;">Statut : <strong>${currentStatus}</strong></p>
+                        <h3>${unitId}</h3>
+                        <p>Statut : <strong>${status}</strong></p>
                         ${gpsHtml}
                         <p style="font-size: 11px; margin-top: 6px; color: #ccc;">${equipmentText}</p>
                     `;
@@ -343,13 +309,12 @@
                 });
 
                 targetSelect.value = currentSelectedTarget;
-                isInitialLoad = false;
+                initialLoadDone = true;
             } catch (err) {
-                console.error("Erreur de synchronisation des unités :", err);
+                console.error("Erreur d'affichage des unités :", err);
             }
         });
 
-        // Map Helper Function
         function centerMapOnUnit(lat, lng, unitId) {
             map.setView([lat, lng], 16, { animate: true });
             if (markers[unitId]) {
@@ -357,7 +322,6 @@
             }
         }
 
-        // Dispatch Mission Function
         function sendMission() {
             const unitId = document.getElementById('target-unit').value;
             const title = document.getElementById('mission-title').value;
@@ -368,7 +332,6 @@
                 return;
             }
 
-            // Update Unit status in Firebase (The database listener handles the log dispatch)
             db.ref(`units/${unitId}`).update({
                 status: "EN_INTERVENTION",
                 active_mission: {
@@ -378,40 +341,54 @@
                 }
             });
 
-            pushSystemLog(`DISPATCH -> ${unitId} : ${title} (${location || 'Secteur'})`, '#ff8800');
+            db.ref('mains_courantes').push({
+                message: `DISPATCH -> ${unitId} : ${title} (${location})`,
+                timestamp: Date.now(),
+                author: 'Opérateur PC',
+                statusColor: '#ff8800'
+            });
 
+            alert(`Ordre de mission transmis à ${unitId} !`);
             document.getElementById('mission-title').value = '';
             document.getElementById('mission-location').value = '';
         }
 
-        // Add Manual MCI Entry
-        function addManualLog() {
+        function addLog() {
             const input = document.getElementById('mc-input');
-            const val = input.value.trim();
-            if (!val) return;
+            if (!input.value) return;
 
-            pushSystemLog(val, '#00a8ff');
+            db.ref('mains_courantes').push({
+                message: input.value,
+                timestamp: Date.now(),
+                author: 'Opérateur PC',
+                statusColor: '#00a8ff'
+            });
             input.value = '';
         }
 
-        // Main-Courante Event Listener (Keeps 50 items max, deduplicated)
+        // Affichage Main-Courante avec protection anti-doublon DOM par ID unique
         db.ref('mains_courantes').limitToLast(50).on('child_added', (snapshot) => {
-            const logKey = snapshot.key;
-            if (renderedLogKeys.has(logKey)) return;
-            renderedLogKeys.add(logKey);
+            const logId = snapshot.key;
+            if (document.getElementById(`log-${logId}`)) return; // Empêche le doublon visuel
 
             const log = snapshot.val();
-            const timeFormatted = formatDate(log.timestamp || Date.now());
+            const dateObj = new Date(log.timestamp);
+            const dateStr = dateObj.toLocaleDateString();
+            const timeStr = dateObj.toLocaleTimeString();
             
             const logsContainer = document.getElementById('logs-container');
             const logDiv = document.createElement('div');
+            logDiv.id = `log-${logId}`;
             logDiv.className = 'log-entry';
             
+            // Application prioritaire et explicite de la couleur de fond du statut
             if (log.statusColor) {
                 logDiv.style.backgroundColor = log.statusColor;
+            } else {
+                logDiv.style.backgroundColor = '#0088ff';
             }
 
-            logDiv.innerHTML = `<strong>[${timeFormatted}]</strong> ${log.message}`;
+            logDiv.innerHTML = `<strong>[${dateStr} - ${timeStr}]</strong> ${log.message}`;
             logsContainer.prepend(logDiv);
         });
     </script>
