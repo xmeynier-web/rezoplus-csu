@@ -17,7 +17,7 @@
         .header-title img { height: 84px; width: auto; object-fit: contain; }
         .header-title h2 { font-size: 26px; font-weight: bold; color: #fff; margin: 0; line-height: 1.15; text-transform: uppercase; letter-spacing: 0.5px; }
 
-        /* Cartouches épurées et compactes */
+        /* Cartouches unités compacts à gauche */
         .card { padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; border-left: 8px solid #777777; background: #2d2d3f; transition: all 0.2s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.4); }
         .card.sos { border-left-color: #ff2222 !important; background: #4a1515 !important; border: 1px solid #ff2222; animation: blink 1s infinite; }
         .card.intervention { border-left-color: #ff8800 !important; background: #3d2612 !important; }
@@ -40,14 +40,32 @@
 
         #main-courante { width: 380px; min-width: 380px; background: #222230; padding: 15px; border-left: 2px solid #333; display: flex; flex-direction: column; z-index: 10; }
         
+        /* Cartouches Main-Courante réduites et ultra-lisibles */
         .log-entry { 
-            padding: 10px; 
+            padding: 6px 10px; 
             border-radius: 6px; 
-            margin-bottom: 8px; 
-            font-size: 13px; 
+            margin-bottom: 4px; 
+            font-size: 12px; 
             color: #ffffff !important; 
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            line-height: 1.4;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            line-height: 1.35;
+        }
+
+        .log-time-badge {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: bold;
+            background: rgba(0, 0, 0, 0.35);
+            padding: 1px 5px;
+            border-radius: 3px;
+            margin-bottom: 3px;
+            letter-spacing: 0.3px;
+        }
+
+        .log-text {
+            font-size: 12px;
+            font-weight: 600;
+            word-wrap: break-word;
         }
 
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
@@ -87,7 +105,7 @@
             <input type="text" id="mc-input" placeholder="Nouvel événement..." style="flex: 1; padding: 8px; border-radius: 4px; border: none; background: #1a1a24; color: #fff;">
             <button onclick="addLog()" style="padding: 8px 12px; background: #0088ff; color: #fff; border: none; border-radius: 4px; cursor: pointer;">Consigner</button>
         </div>
-        <div id="logs-container" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 6px;"></div>
+        <div id="logs-container" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 4px;"></div>
     </div>
 
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
@@ -317,6 +335,7 @@
             input.value = '';
         }
 
+        // Affichage compact et très lisible de la Main-Courante
         db.ref('mains_courantes').limitToLast(50).on('child_added', (snapshot) => {
             const logId = snapshot.key;
             if (document.getElementById(`log-${logId}`)) return;
@@ -337,7 +356,10 @@
                 logDiv.style.backgroundColor = '#0088ff';
             }
 
-            logDiv.innerHTML = `<strong>[${dateStr} - ${timeStr}]</strong> ${log.message}`;
+            logDiv.innerHTML = `
+                <div class="log-time-badge">⏱ ${dateStr} - ${timeStr}</div>
+                <div class="log-text">${log.message}</div>
+            `;
             logsContainer.prepend(logDiv);
         });
     </script>
