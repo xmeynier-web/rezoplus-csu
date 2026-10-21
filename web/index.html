@@ -16,15 +16,15 @@
         .header-title { display: flex; align-items: center; gap: 15px; font-size: 20px; font-weight: bold; padding-bottom: 5px; }
         .header-title img { height: 84px; width: auto; object-fit: contain; }
 
-        .card { padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 8px solid #0088ff; background: #2d2d3f; transition: all 0.2s ease; }
-        
+        /* Style harmonisé pour toutes les cartes d'unités à gauche */
+        .card { padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 8px solid #777777; background: #2d2d3f; transition: all 0.2s ease; }
         .card.sos { border-left-color: #ff2222 !important; background: #4a1515 !important; border: 1px solid #ff2222; animation: blink 1s infinite; }
-        .card.intervention { border-left-color: #ff8800 !important; background: #3d2612 !important; border: 1px solid #ff8800; }
-        .card.controle_pr { border-left-color: #009688 !important; background: #00332c !important; border: 1px solid #009688; }
-        .card.patrouille { border-left-color: #22bb33 !important; background: #123018 !important; }
-        .card.transport { border-left-color: #00a8ff !important; background: #12223b !important; }
-        .card.retour { border-left-color: #9c27b0 !important; background: #2b1638 !important; }
-        .card.hors_service { border-left-color: #777777 !important; background: #222226 !important; opacity: 0.7; }
+        .card.intervention { border-left-color: #ff8800 !important; background: #2d2d3f !important; }
+        .card.controle_pr { border-left-color: #009688 !important; background: #2d2d3f !important; }
+        .card.patrouille { border-left-color: #22bb33 !important; background: #2d2d3f !important; }
+        .card.transport { border-left-color: #00a8ff !important; background: #2d2d3f !important; }
+        .card.retour { border-left-color: #9c27b0 !important; background: #2d2d3f !important; }
+        .card.hors_service { border-left-color: #777777 !important; background: #2d2d3f !important; opacity: 0.7; }
 
         .dispatch-box { background: #262638; padding: 12px; border-radius: 8px; border: 1px solid #444; display: flex; flex-direction: column; gap: 8px; }
         .dispatch-box input, .dispatch-box select { padding: 8px; border-radius: 4px; border: none; background: #1a1a24; color: #fff; }
@@ -117,7 +117,6 @@
             zoom: 16
         });
 
-        // Utilisation du serveur OpenStreetMap standard (Open-source et sans clé requise)
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
