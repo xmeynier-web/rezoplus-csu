@@ -13,13 +13,12 @@
         
         #sidebar { width: 420px; min-width: 420px; background: #222230; padding: 15px; display: flex; flex-direction: column; gap: 15px; border-right: 2px solid #333; overflow-y: auto; z-index: 10; }
         
-        /* En-tête : Texte sur 2 lignes, agrandi et parfaitement aligné */
         .header-title { display: flex; align-items: center; gap: 15px; padding-bottom: 5px; }
         .header-title img { height: 84px; width: auto; object-fit: contain; }
         .header-title h2 { font-size: 26px; font-weight: bold; color: #fff; margin: 0; line-height: 1.15; text-transform: uppercase; letter-spacing: 0.5px; }
 
-        /* Cartouches d'unités à gauche : Fond intégralement coloré selon statut */
-        .card { padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 8px solid #777777; background: #2d2d3f; transition: all 0.2s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.4); }
+        /* Cartouches épurées et compactes */
+        .card { padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; border-left: 8px solid #777777; background: #2d2d3f; transition: all 0.2s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.4); }
         .card.sos { border-left-color: #ff2222 !important; background: #4a1515 !important; border: 1px solid #ff2222; animation: blink 1s infinite; }
         .card.intervention { border-left-color: #ff8800 !important; background: #3d2612 !important; }
         .card.controle_pr { border-left-color: #009688 !important; background: #00332c !important; }
@@ -27,6 +26,10 @@
         .card.transport { border-left-color: #00a8ff !important; background: #12223b !important; }
         .card.retour { border-left-color: #9c27b0 !important; background: #2b1638 !important; }
         .card.hors_service { border-left-color: #777777 !important; background: #222226 !important; opacity: 0.7; }
+
+        .card-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .card-unit-title { font-size: 17px; font-weight: bold; color: #fff; }
+        .card-status-badge { font-size: 12px; font-weight: bold; padding: 2px 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.15); color: #fff; }
 
         .dispatch-box { background: #262638; padding: 12px; border-radius: 8px; border: 1px solid #444; display: flex; flex-direction: column; gap: 8px; }
         .dispatch-box input, .dispatch-box select { padding: 8px; border-radius: 4px; border: none; background: #1a1a24; color: #fff; }
@@ -46,9 +49,6 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.3);
             line-height: 1.4;
         }
-
-        .btn-locate { background: #0088ff; color: #fff; border: none; padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-top: 6px; font-weight: bold; }
-        .btn-locate:hover { background: #0066cc; }
 
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
     </style>
@@ -153,7 +153,6 @@
             }
         }
 
-        // Nettoyage des marqueurs
         db.ref('units').on('child_removed', (snapshot) => {
             const unitId = snapshot.key;
             if (markers[unitId]) {
@@ -162,7 +161,6 @@
             }
         });
 
-        // Affichage dynamique et synchronisé des unités
         db.ref('units').on('value', (snapshot) => {
             try {
                 const units = snapshot.val();
@@ -245,26 +243,26 @@
                         markers[unitId] = marker;
                     }
 
-                    let equipmentText = "Aucun matériel coché";
+                    let equipmentText = "Aucun matériel";
                     if (unit.equipment && typeof unit.equipment === 'object') {
                         const checkedItems = Object.keys(unit.equipment).filter(key => unit.equipment[key] === true || unit.equipment[key] === 'true');
                         if (checkedItems.length > 0) {
-                            equipmentText = "Embarqué : " + checkedItems.join(', ');
+                            equipmentText = checkedItems.join(', ');
                         }
                     }
 
                     const cardClass = getStatusClass(status);
                     const cardDiv = document.createElement('div');
                     cardDiv.className = `card ${cardClass}`;
-                    
-                    let gpsHtml = `<p style="font-size: 11px; margin-top: 4px; color: #4caf50;">GPS : ${lat.toFixed(4)}, ${lng.toFixed(4)}</p>
-                       <button class="btn-locate" onclick="centerMapOnUnit(${lat}, ${lng}, '${unitId}')">📍 Centrer sur la carte</button>`;
 
                     cardDiv.innerHTML = `
-                        <h3 style="font-size: 18px; margin-bottom: 4px;">${unitId}</h3>
-                        <p style="font-size: 14px;">Statut : <strong>${status}</strong></p>
-                        ${gpsHtml}
-                        <p style="font-size: 11px; margin-top: 6px; color: #ccc;">${equipmentText}</p>
+                        <div class="card-header-row">
+                            <span class="card-unit-title">🚓 ${unitId}</span>
+                            <span class="card-status-badge">${status}</span>
+                        </div>
+                        <p style="font-size: 11px; color: #ddd; margin-top: 4px; line-height: 1.3;">
+                            <strong>Embarqué :</strong> ${equipmentText}
+                        </p>
                     `;
                     unitsContainer.appendChild(cardDiv);
                 });
@@ -274,13 +272,6 @@
                 console.error("Erreur d'affichage des unités :", err);
             }
         });
-
-        function centerMapOnUnit(lat, lng, unitId) {
-            map.setView([lat, lng], 16, { animate: true });
-            if (markers[unitId]) {
-                markers[unitId].openPopup();
-            }
-        }
 
         function sendMission() {
             const unitId = document.getElementById('target-unit').value;
