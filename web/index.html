@@ -33,7 +33,7 @@
         #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
 
         #main-courante { width: 380px; min-width: 380px; background: #222230; padding: 15px; border-left: 2px solid #333; display: flex; flex-direction: column; z-index: 10; }
-        .log-entry { background: #2d2d3f; padding: 8px; border-radius: 5px; margin-bottom: 8px; font-size: 13px; border-left: 3px solid #00a8ff; }
+        .log-entry { background: #2d2d3f; padding: 8px; border-radius: 5px; margin-bottom: 8px; font-size: 13px; border-left: 4px solid #00a8ff; }
 
         .btn-locate { background: #0088ff; color: #fff; border: none; padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-top: 6px; font-weight: bold; }
         .btn-locate:hover { background: #0066cc; }
@@ -114,6 +114,7 @@
         const markers = {};
         const manualPositions = {};
         const previousStatuses = {};
+        let initialLoadDone = false;
 
         function getStatusColor(status) {
             switch(status) {
@@ -139,6 +140,20 @@
             }
         }
 
+        db.ref('units').on('child_removed', (snapshot) => {
+            const unitId = snapshot.key;
+            db.ref('mains_courantes').push({
+                message: `DÉCONNEXION -> Fin de service / Déconnexion de l'application : ${unitId}`,
+                timestamp: Date.now(),
+                author: 'Système',
+                statusColor: '#777777'
+            });
+            if (markers[unitId]) {
+                map.removeLayer(markers[unitId]);
+                delete markers[unitId];
+            }
+        });
+
         db.ref('units').on('value', (snapshot) => {
             try {
                 const units = snapshot.val();
@@ -163,12 +178,14 @@
                     targetSelect.appendChild(opt1);
 
                     let status = unit.status || 'INDISPONIBLE';
+                    let badgeColor = getStatusColor(status);
 
-                    if (previousStatuses[unitId] && previousStatuses[unitId] !== status) {
+                    if (initialLoadDone && previousStatuses[unitId] && previousStatuses[unitId] !== status) {
                         db.ref('mains_courantes').push({
                             message: `STATUT -> Indicatif : ${unitId} | Statut : ${status}`,
                             timestamp: Date.now(),
-                            author: 'Système'
+                            author: 'Système',
+                            statusColor: badgeColor
                         });
                     }
                     previousStatuses[unitId] = status;
@@ -186,8 +203,6 @@
                             }
                         }
                     }
-
-                    let badgeColor = getStatusColor(status);
 
                     const pinHtml = `
                         <div style="display: flex; flex-direction: column; align-items: center; filter: drop-shadow(0px 3px 6px rgba(0,0,0,0.6)); cursor: grab;">
@@ -226,7 +241,8 @@
                             db.ref('mains_courantes').push({
                                 message: `RADIO -> Repositionnement manuel de ${unitId} à (${newPos.lat.toFixed(4)}, ${newPos.lng.toFixed(4)})`,
                                 timestamp: Date.now(),
-                                author: 'Opérateur PC'
+                                author: 'Opérateur PC',
+                                statusColor: '#00a8ff'
                             });
                         });
 
@@ -235,96 +251,4 @@
 
                     let equipmentText = "Aucun matériel coché";
                     if (unit.equipment && typeof unit.equipment === 'object') {
-                        const checkedItems = Object.keys(unit.equipment).filter(key => unit.equipment[key] === true || unit.equipment[key] === 'true');
-                        if (checkedItems.length > 0) {
-                            equipmentText = "Embarqué : " + checkedItems.join(', ');
-                        }
-                    }
-
-                    const cardClass = getStatusClass(status);
-                    const cardDiv = document.createElement('div');
-                    cardDiv.className = `card ${cardClass}`;
-                    
-                    let gpsHtml = `<p style="font-size: 11px; margin-top: 4px; color: #4caf50;">GPS : ${lat.toFixed(4)}, ${lng.toFixed(4)}</p>
-                       <button class="btn-locate" onclick="centerMapOnUnit(${lat}, ${lng}, '${unitId}')">📍 Centrer sur la carte</button>`;
-
-                    cardDiv.innerHTML = `
-                        <h3>${unitId}</h3>
-                        <p>Statut : <strong>${status}</strong></p>
-                        ${gpsHtml}
-                        <p style="font-size: 11px; margin-top: 6px; color: #ccc;">${equipmentText}</p>
-                    `;
-                    unitsContainer.appendChild(cardDiv);
-                });
-
-                targetSelect.value = currentSelectedTarget;
-            } catch (err) {
-                console.error("Erreur d'affichage des unités :", err);
-            }
-        });
-
-        function centerMapOnUnit(lat, lng, unitId) {
-            map.setView([lat, lng], 16, { animate: true });
-            if (markers[unitId]) {
-                markers[unitId].openPopup();
-            }
-        }
-
-        function sendMission() {
-            const unitId = document.getElementById('target-unit').value;
-            const title = document.getElementById('mission-title').value;
-            const location = document.getElementById('mission-location').value;
-
-            if (!unitId || !title) {
-                alert("Veuillez sélectionner une unité et indiquer l'objet de l'intervention.");
-                return;
-            }
-
-            db.ref(`units/${unitId}`).update({
-                status: "EN_INTERVENTION",
-                active_mission: {
-                    title: title,
-                    location: location || "Non précisée",
-                    timestamp: Date.now()
-                }
-            });
-
-            db.ref('mains_courantes').push({
-                message: `DISPATCH -> ${unitId} : ${title} (${location})`,
-                timestamp: Date.now(),
-                author: 'Opérateur PC'
-            });
-
-            alert(`Ordre de mission transmis à ${unitId} !`);
-            document.getElementById('mission-title').value = '';
-            document.getElementById('mission-location').value = '';
-        }
-
-        function addLog() {
-            const input = document.getElementById('mc-input');
-            if (!input.value) return;
-
-            db.ref('mains_courantes').push({
-                message: input.value,
-                timestamp: Date.now(),
-                author: 'Opérateur PC'
-            });
-            input.value = '';
-        }
-
-        // Affichage de la main-courante limité aux 35 dernières lignes
-        db.ref('mains_courantes').limitToLast(35).on('child_added', (snapshot) => {
-            const log = snapshot.val();
-            const dateObj = new Date(log.timestamp);
-            const dateStr = dateObj.toLocaleDateString();
-            const timeStr = dateObj.toLocaleTimeString();
-            
-            const logsContainer = document.getElementById('logs-container');
-            const logDiv = document.createElement('div');
-            logDiv.className = 'log-entry';
-            logDiv.innerHTML = `<strong>[${dateStr} - ${timeStr}]</strong> ${log.message}`;
-            logsContainer.prepend(logDiv);
-        });
-    </script>
-</body>
-</html>
+                        const checkedItems = Object.keys(unit.equipment).filter(key => unit.equipment[key] === true || unit.equipment
