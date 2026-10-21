@@ -13,6 +13,10 @@
         
         #sidebar { width: 400px; min-width: 400px; background: #222230; padding: 15px; display: flex; flex-direction: column; gap: 15px; border-right: 2px solid #333; overflow-y: auto; z-index: 10; }
         
+        /* Style du titre avec logo aligné */
+        .header-title { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: bold; }
+        .header-title img { height: 28px; width: auto; object-fit: contain; }
+
         .card { padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 8px solid #0088ff; background: #2d2d3f; transition: all 0.2s ease; }
         
         .card.sos { border-left-color: #ff2222 !important; background: #4a1515 !important; border: 1px solid #ff2222; animation: blink 1s infinite; }
@@ -26,8 +30,6 @@
         .dispatch-box { background: #262638; padding: 12px; border-radius: 8px; border: 1px solid #444; display: flex; flex-direction: column; gap: 8px; }
         .dispatch-box input, .dispatch-box select { padding: 8px; border-radius: 4px; border: none; background: #1a1a24; color: #fff; }
         .dispatch-box button { background: #ff8800; color: #fff; cursor: pointer; font-weight: bold; padding: 8px; border-radius: 4px; border: none; }
-        
-        .info-box { background: #262638; padding: 10px; border-radius: 8px; border: 1px solid #0088ff; font-size: 12px; color: #00ffcc; text-align: center; }
 
         #map-container { flex: 1; height: 100vh; position: relative; display: block; }
         #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
@@ -44,7 +46,10 @@
 <body>
 
     <div id="sidebar">
-        <h2>Poste de Commandement</h2>
+        <div class="header-title">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Logo_Police_Municipale_%28France%29.svg/1280px-Logo_Police_Municipale_%28France%29.svg.png" alt="Logo PM">
+            <h2>Poste de Commandement</h2>
+        </div>
         
         <div class="dispatch-box">
             <h3>📢 Dispatch Intervention</h3>
@@ -54,10 +59,6 @@
             <input type="text" id="mission-title" placeholder="Objet (ex: Vol, Contrôle...)">
             <input type="text" id="mission-location" placeholder="Adresse ou lieu-dit">
             <button onclick="sendMission()">Transmettre l'ordre de mission</button>
-        </div>
-
-        <div class="info-box">
-            📍 <strong>Position Poste :</strong> 14 rue Roger Salengro, Fresnes.<br>Glissez chaque épingle pour la repositionner.
         </div>
 
         <hr style="border-color: #444;">
@@ -251,4 +252,103 @@
 
                     let equipmentText = "Aucun matériel coché";
                     if (unit.equipment && typeof unit.equipment === 'object') {
-                        const checkedItems = Object.keys(unit.equipment).filter(key => unit.equipment[key] === true || unit.equipment
+                        const checkedItems = Object.keys(unit.equipment).filter(key => unit.equipment[key] === true || unit.equipment[key] === 'true');
+                        if (checkedItems.length > 0) {
+                            equipmentText = "Embarqué : " + checkedItems.join(', ');
+                        }
+                    }
+
+                    const cardClass = getStatusClass(status);
+                    const cardDiv = document.createElement('div');
+                    cardDiv.className = `card ${cardClass}`;
+                    
+                    let gpsHtml = `<p style="font-size: 11px; margin-top: 4px; color: #4caf50;">GPS : ${lat.toFixed(4)}, ${lng.toFixed(4)}</p>
+                       <button class="btn-locate" onclick="centerMapOnUnit(${lat}, ${lng}, '${unitId}')">📍 Centrer sur la carte</button>`;
+
+                    cardDiv.innerHTML = `
+                        <h3>${unitId}</h3>
+                        <p>Statut : <strong>${status}</strong></p>
+                        ${gpsHtml}
+                        <p style="font-size: 11px; margin-top: 6px; color: #ccc;">${equipmentText}</p>
+                    `;
+                    unitsContainer.appendChild(cardDiv);
+                });
+
+                targetSelect.value = currentSelectedTarget;
+                initialLoadDone = true;
+            } catch (err) {
+                console.error("Erreur d'affichage des unités :", err);
+            }
+        });
+
+        function centerMapOnUnit(lat, lng, unitId) {
+            map.setView([lat, lng], 16, { animate: true });
+            if (markers[unitId]) {
+                markers[unitId].openPopup();
+            }
+        }
+
+        function sendMission() {
+            const unitId = document.getElementById('target-unit').value;
+            const title = document.getElementById('mission-title').value;
+            const location = document.getElementById('mission-location').value;
+
+            if (!unitId || !title) {
+                alert("Veuillez sélectionner une unité et indiquer l'objet de l'intervention.");
+                return;
+            }
+
+            db.ref(`units/${unitId}`).update({
+                status: "EN_INTERVENTION",
+                active_mission: {
+                    title: title,
+                    location: location || "Non précisée",
+                    timestamp: Date.now()
+                }
+            });
+
+            db.ref('mains_courantes').push({
+                message: `DISPATCH -> ${unitId} : ${title} (${location})`,
+                timestamp: Date.now(),
+                author: 'Opérateur PC',
+                statusColor: '#ff8800'
+            });
+
+            alert(`Ordre de mission transmis à ${unitId} !`);
+            document.getElementById('mission-title').value = '';
+            document.getElementById('mission-location').value = '';
+        }
+
+        function addLog() {
+            const input = document.getElementById('mc-input');
+            if (!input.value) return;
+
+            db.ref('mains_courantes').push({
+                message: input.value,
+                timestamp: Date.now(),
+                author: 'Opérateur PC',
+                statusColor: '#0088ff'
+            });
+            input.value = '';
+        }
+
+        db.ref('mains_courantes').limitToLast(50).on('child_added', (snapshot) => {
+            const log = snapshot.val();
+            const dateObj = new Date(log.timestamp);
+            const dateStr = dateObj.toLocaleDateString();
+            const timeStr = dateObj.toLocaleTimeString();
+            
+            const logsContainer = document.getElementById('logs-container');
+            const logDiv = document.createElement('div');
+            logDiv.className = 'log-entry';
+            
+            if (log.statusColor) {
+                logDiv.style.borderLeftColor = log.statusColor;
+            }
+
+            logDiv.innerHTML = `<strong>[${dateStr} - ${timeStr}]</strong> ${log.message}`;
+            logsContainer.prepend(logDiv);
+        });
+    </script>
+</body>
+</html>
