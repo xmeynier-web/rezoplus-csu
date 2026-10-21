@@ -149,6 +149,7 @@
         });
 
         const markers = {};
+        const previousStatuses = {}; // Cache local pour détecter les vrais changements de statut
 
         function getStatusColor(status) {
             switch(status) {
@@ -176,13 +177,20 @@
 
         db.ref('units').on('child_removed', (snapshot) => {
             const unitId = snapshot.key;
+            db.ref('mains_courantes').push({
+                message: `DÉCONNEXION -> Fin de service / Déconnexion : ${unitId}`,
+                timestamp: Date.now(),
+                author: 'Système',
+                statusColor: '#777777'
+            });
+            delete previousStatuses[unitId];
             if (markers[unitId]) {
                 map.removeLayer(markers[unitId]);
                 delete markers[unitId];
             }
         });
 
-        // Lecture non-bloquante et fluide des unités
+        // Gestionnaire global et stable des unités pour alimenter la carte, la sidebar et la main-courante
         db.ref('units').on('value', (snapshot) => {
             try {
                 const units = snapshot.val();
@@ -208,6 +216,22 @@
 
                     let status = unit.status || 'INDISPONIBLE';
                     let badgeColor = getStatusColor(status);
+
+                    // Détection des changements de statut pour incrémenter la main-courante automatiquement
+                    if (previousStatuses[unitId] !== undefined && previousStatuses[unitId] !== status) {
+                        let logPrefix = "STATUT";
+                        if (status === 'SOS_ACTIF') {
+                            logPrefix = "🚨 DÉCLENCHEMENT SOS 🚨";
+                        }
+                        
+                        db.ref('mains_courantes').push({
+                            message: `${logPrefix} -> Indicatif : ${unitId} | Statut : ${status}`,
+                            timestamp: Date.now(),
+                            author: 'Système',
+                            statusColor: badgeColor
+                        });
+                    }
+                    previousStatuses[unitId] = status;
 
                     let lat = DEFAULT_LAT;
                     let lng = DEFAULT_LNG;
@@ -273,7 +297,6 @@
                         }
                     }
 
-                    // Affichage de la mission active si présente
                     let missionHtml = '';
                     if (status === 'EN_INTERVENTION' && unit.active_mission) {
                         const mTitle = unit.active_mission.title || unit.active_mission.titre || 'Intervention en cours';
@@ -310,7 +333,6 @@
             }
         });
 
-        // Transmettre une mission sans bloquer l'interface
         function sendMission() {
             const unitId = document.getElementById('target-unit').value;
             const title = document.getElementById('mission-title').value.trim();
@@ -354,12 +376,11 @@
             });
         }
 
-        // Clôturer l'intervention depuis le PC et remettre l'unité en patrouille
         function endMission(unitId) {
             const nowTimestamp = Date.now();
             const updates = {};
             updates[`units/${unitId}/status`] = "EN_PATROUILLE";
-            updates[`units/${unitId}/active_mission`] = null; // Supprime la mission active
+            updates[`units/${unitId}/active_mission`] = null;
 
             db.ref().update(updates).then(() => {
                 db.ref('mains_courantes').push({
@@ -386,6 +407,7 @@
             input.value = '';
         }
 
+        // Écouteur principal pour alimenter dynamiquement la main-courante
         db.ref('mains_courantes').limitToLast(50).on('child_added', (snapshot) => {
             const logId = snapshot.key;
             if (document.getElementById(`log-${logId}`)) return;
