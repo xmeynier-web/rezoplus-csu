@@ -31,6 +31,9 @@
         .card-unit-title { font-size: 17px; font-weight: bold; color: #fff; }
         .card-status-badge { font-size: 12px; font-weight: bold; padding: 2px 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.15); color: #fff; }
 
+        .btn-end-mission { background: #ff4444; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-top: 6px; font-weight: bold; width: 100%; }
+        .btn-end-mission:hover { background: #cc0000; }
+
         .dispatch-box { background: #262638; padding: 12px; border-radius: 8px; border: 1px solid #444; display: flex; flex-direction: column; gap: 8px; }
         .dispatch-box input, .dispatch-box select { padding: 8px; border-radius: 4px; border: none; background: #1a1a24; color: #fff; }
         .dispatch-box button { background: #ff8800; color: #fff; cursor: pointer; font-weight: bold; padding: 8px; border-radius: 4px; border: none; }
@@ -179,6 +182,7 @@
             }
         });
 
+        // Lecture non-bloquante et fluide des unités
         db.ref('units').on('value', (snapshot) => {
             try {
                 const units = snapshot.val();
@@ -269,6 +273,20 @@
                         }
                     }
 
+                    // Affichage de la mission active si présente
+                    let missionHtml = '';
+                    if (status === 'EN_INTERVENTION' && unit.active_mission) {
+                        const mTitle = unit.active_mission.title || unit.active_mission.titre || 'Intervention en cours';
+                        const mLoc = unit.active_mission.location || unit.active_mission.adresse || 'Lieu non précisé';
+                        missionHtml = `
+                            <div style="margin-top: 6px; padding: 6px; background: rgba(0,0,0,0.3); border-radius: 4px; font-size: 11px; border-left: 3px solid #ff8800;">
+                                🎯 <strong>Mission :</strong> ${mTitle}<br>
+                                📍 <strong>Lieu :</strong> ${mLoc}
+                            </div>
+                            <button class="btn-end-mission" onclick="endMission('${unitId}')">Clôturer l'intervention</button>
+                        `;
+                    }
+
                     const cardClass = getStatusClass(status);
                     const cardDiv = document.createElement('div');
                     cardDiv.className = `card ${cardClass}`;
@@ -281,6 +299,7 @@
                         <p style="font-size: 11px; color: #ddd; margin-top: 4px; line-height: 1.3;">
                             <strong>Embarqué :</strong> ${equipmentText}
                         </p>
+                        ${missionHtml}
                     `;
                     unitsContainer.appendChild(cardDiv);
                 });
@@ -291,7 +310,7 @@
             }
         });
 
-        // Transmettre une mission (Mise à jour sécurisée et compatible Mobile / Flutter)
+        // Transmettre une mission sans bloquer l'interface
         function sendMission() {
             const unitId = document.getElementById('target-unit').value;
             const title = document.getElementById('mission-title').value.trim();
@@ -308,7 +327,6 @@
 
             const nowTimestamp = Date.now();
 
-            // Mises à jour structurées pour assurer la compatibilité complète avec l'application mobile
             const updates = {};
             updates[`units/${unitId}/status`] = "EN_INTERVENTION";
             updates[`units/${unitId}/active_mission`] = {
@@ -321,7 +339,6 @@
             };
 
             db.ref().update(updates).then(() => {
-                // Consignation directe dans la main-courante
                 db.ref('mains_courantes').push({
                     message: `DISPATCH -> Ordre de mission transmis à ${unitId} : ${title} (${location || "Lieu non précisé"})`,
                     timestamp: nowTimestamp,
@@ -329,12 +346,30 @@
                     statusColor: '#ff8800'
                 });
 
-                alert(`Ordre de mission transmis avec succès à l'unité ${unitId} !`);
                 document.getElementById('mission-title').value = '';
                 document.getElementById('mission-location').value = '';
             }).catch((error) => {
                 console.error("Erreur d'envoi de mission :", error);
-                alert("Erreur lors de la transmission de l'ordre de mission : " + error.message);
+                alert("Erreur lors de la transmission : " + error.message);
+            });
+        }
+
+        // Clôturer l'intervention depuis le PC et remettre l'unité en patrouille
+        function endMission(unitId) {
+            const nowTimestamp = Date.now();
+            const updates = {};
+            updates[`units/${unitId}/status`] = "EN_PATROUILLE";
+            updates[`units/${unitId}/active_mission`] = null; // Supprime la mission active
+
+            db.ref().update(updates).then(() => {
+                db.ref('mains_courantes').push({
+                    message: `FIN MISSION -> L'unité ${unitId} a clôturé son intervention et repasse EN_PATROUILLE`,
+                    timestamp: nowTimestamp,
+                    author: 'Opérateur PC',
+                    statusColor: '#22bb33'
+                });
+            }).catch((error) => {
+                console.error("Erreur lors de la clôture de mission :", error);
             });
         }
 
