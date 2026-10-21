@@ -126,9 +126,8 @@
         });
 
         const markers = {};
-        const manualPositions = {};
         const previousStatuses = {};
-        let initialLoadCompleted = false;
+        let initialLoadDone = false;
 
         function getStatusColor(status) {
             switch(status) {
@@ -154,7 +153,7 @@
             }
         }
 
-        // Surveillance des suppressions (Déconnexions / Fin de service)
+        // 1. Détection des déconnexions (suppression d'unité)
         db.ref('units').on('child_removed', (snapshot) => {
             const unitId = snapshot.key;
             db.ref('mains_courantes').push({
@@ -170,15 +169,14 @@
             }
         });
 
-        // Surveillance des changements individuels (pour éviter les doublons globaux)
+        // 2. Détection unique des changements de statut (évite les doublons)
         db.ref('units').on('child_changed', (snapshot) => {
-            if (!initialLoadCompleted) return;
+            if (!initialLoadDone) return;
             const unitId = snapshot.key;
             const unit = snapshot.val();
             const newStatus = unit.status || 'INDISPONIBLE';
 
             if (previousStatuses[unitId] && previousStatuses[unitId] !== newStatus) {
-                const oldStatus = previousStatuses[unitId];
                 previousStatuses[unitId] = newStatus;
                 
                 let logPrefix = "STATUT";
@@ -195,9 +193,9 @@
             }
         });
 
-        // Surveillance de l'ajout d'une nouvelle unité (Connexion / Allumage)
+        // 3. Détection de l'allumage / connexion d'une unité
         db.ref('units').on('child_added', (snapshot) => {
-            if (!initialLoadCompleted) return;
+            if (!initialLoadDone) return;
             const unitId = snapshot.key;
             const unit = snapshot.val();
             const status = unit.status || 'INDISPONIBLE';
@@ -213,7 +211,7 @@
             }
         });
 
-        // Chargement global de l'interface et de la carte
+        // 4. Chargement et rafraîchissement global de l'interface et de la carte (avec persistance des positions GPS)
         db.ref('units').on('value', (snapshot) => {
             try {
                 const units = snapshot.val();
@@ -227,7 +225,7 @@
 
                 if (!units) {
                     unitsContainer.innerHTML = '<p style="font-size: 12px; color: #aaa; text-align: center; padding: 10px;">Aucune unité en ligne</p>';
-                    initialLoadCompleted = true;
+                    initialLoadDone = true;
                     return;
                 }
 
@@ -240,22 +238,20 @@
 
                     let status = unit.status || 'INDISPONIBLE';
                     
-                    // Mémorisation de départ sans déclencher de log en double
                     if (!previousStatuses[unitId]) {
                         previousStatuses[unitId] = status;
                     }
 
-                    let lat = manualPositions[unitId] ? manualPositions[unitId].lat : DEFAULT_LAT;
-                    let lng = manualPositions[unitId] ? manualPositions[unitId].lng : DEFAULT_LNG;
+                    // Utilisation prioritaire des coordonnées persistées dans Firebase (glisser-déposer mémorisé)
+                    let lat = DEFAULT_LAT;
+                    let lng = DEFAULT_LNG;
 
-                    if (!manualPositions[unitId] && unit.latitude && unit.longitude) {
+                    if (unit.latitude && unit.longitude) {
                         const parsedLat = parseFloat(unit.latitude);
                         const parsedLng = parseFloat(unit.longitude);
                         if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
-                            if (Math.abs(parsedLat - 48.7538) > 0.0005 || Math.abs(parsedLng - 2.3218) > 0.0005) {
-                                lat = parsedLat;
-                                lng = parsedLng;
-                            }
+                            lat = parsedLat;
+                            lng = parsedLng;
                         }
                     }
 
@@ -285,9 +281,9 @@
                         const marker = L.marker([lat, lng], { icon: customIcon, draggable: true }).addTo(map)
                             .bindPopup(`<b>Unité : ${unitId}</b><br>Glissez l'épingle pour la replacer.`);
 
+                        // Mémorisation persistante dans Firebase de la nouvelle position après déplacement
                         marker.on('dragend', function(event) {
                             const newPos = event.target.getLatLng();
-                            manualPositions[unitId] = { lat: newPos.lat, lng: newPos.lng };
 
                             db.ref(`units/${unitId}`).update({
                                 latitude: newPos.lat,
@@ -331,7 +327,7 @@
                 });
 
                 targetSelect.value = currentSelectedTarget;
-                initialLoadCompleted = true;
+                initialLoadDone = true;
             } catch (err) {
                 console.error("Erreur d'affichage des unités :", err);
             }
