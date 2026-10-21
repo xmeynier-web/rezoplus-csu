@@ -13,18 +13,20 @@
         
         #sidebar { width: 420px; min-width: 420px; background: #222230; padding: 15px; display: flex; flex-direction: column; gap: 15px; border-right: 2px solid #333; overflow-y: auto; z-index: 10; }
         
+        /* En-tête : Texte sur 2 lignes, agrandi et parfaitement aligné */
         .header-title { display: flex; align-items: center; gap: 15px; padding-bottom: 5px; }
         .header-title img { height: 84px; width: auto; object-fit: contain; }
-        .header-title h2 { font-size: 20px; font-weight: bold; color: #fff; margin: 0; line-height: 1.2; }
+        .header-title h2 { font-size: 26px; font-weight: bold; color: #fff; margin: 0; line-height: 1.15; text-transform: uppercase; letter-spacing: 0.5px; }
 
-        .card { padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 8px solid #777777; background: #2d2d3f; transition: all 0.2s ease; }
+        /* Cartouches d'unités à gauche : Fond intégralement coloré selon statut */
+        .card { padding: 12px; border-radius: 8px; margin-bottom: 10px; border-left: 8px solid #777777; background: #2d2d3f; transition: all 0.2s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.4); }
         .card.sos { border-left-color: #ff2222 !important; background: #4a1515 !important; border: 1px solid #ff2222; animation: blink 1s infinite; }
-        .card.intervention { border-left-color: #ff8800 !important; background: #2d2d3f !important; }
-        .card.controle_pr { border-left-color: #009688 !important; background: #2d2d3f !important; }
-        .card.patrouille { border-left-color: #22bb33 !important; background: #2d2d3f !important; }
-        .card.transport { border-left-color: #00a8ff !important; background: #2d2d3f !important; }
-        .card.retour { border-left-color: #9c27b0 !important; background: #2d2d3f !important; }
-        .card.hors_service { border-left-color: #777777 !important; background: #2d2d3f !important; opacity: 0.7; }
+        .card.intervention { border-left-color: #ff8800 !important; background: #3d2612 !important; }
+        .card.controle_pr { border-left-color: #009688 !important; background: #00332c !important; }
+        .card.patrouille { border-left-color: #22bb33 !important; background: #123018 !important; }
+        .card.transport { border-left-color: #00a8ff !important; background: #12223b !important; }
+        .card.retour { border-left-color: #9c27b0 !important; background: #2b1638 !important; }
+        .card.hors_service { border-left-color: #777777 !important; background: #222226 !important; opacity: 0.7; }
 
         .dispatch-box { background: #262638; padding: 12px; border-radius: 8px; border: 1px solid #444; display: flex; flex-direction: column; gap: 8px; }
         .dispatch-box input, .dispatch-box select { padding: 8px; border-radius: 4px; border: none; background: #1a1a24; color: #fff; }
@@ -56,7 +58,7 @@
     <div id="sidebar">
         <div class="header-title">
             <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Logo_Police_Municipale_%28France%29.svg/1280px-Logo_Police_Municipale_%28France%29.svg.png" alt="Logo PM">
-            <h2>Poste de Commandement</h2>
+            <h2>Poste de<br>Commandement</h2>
         </div>
         
         <div class="dispatch-box">
@@ -151,7 +153,7 @@
             }
         }
 
-        // Nettoyage des marqueurs de la carte lorsqu'une unité se déconnecte
+        // Nettoyage des marqueurs
         db.ref('units').on('child_removed', (snapshot) => {
             const unitId = snapshot.key;
             if (markers[unitId]) {
@@ -160,7 +162,7 @@
             }
         });
 
-        // Mise à jour visuelle des unités sur le tableau de bord et la carte
+        // Affichage dynamique et synchronisé des unités
         db.ref('units').on('value', (snapshot) => {
             try {
                 const units = snapshot.val();
@@ -187,7 +189,6 @@
                     let status = unit.status || 'INDISPONIBLE';
                     let badgeColor = getStatusColor(status);
 
-                    // Position GPS (priorité à la base Firebase)
                     let lat = DEFAULT_LAT;
                     let lng = DEFAULT_LNG;
 
@@ -224,7 +225,6 @@
                         const marker = L.marker([lat, lng], { icon: customIcon, draggable: true }).addTo(map)
                             .bindPopup(`<b>Unité : ${unitId}</b><br>Glissez l'épingle pour la replacer.`);
 
-                        // Sauvegarde de la position déplacée
                         marker.on('dragend', function(event) {
                             const newPos = event.target.getLatLng();
 
@@ -261,8 +261,8 @@
                        <button class="btn-locate" onclick="centerMapOnUnit(${lat}, ${lng}, '${unitId}')">📍 Centrer sur la carte</button>`;
 
                     cardDiv.innerHTML = `
-                        <h3>${unitId}</h3>
-                        <p>Statut : <strong>${status}</strong></p>
+                        <h3 style="font-size: 18px; margin-bottom: 4px;">${unitId}</h3>
+                        <p style="font-size: 14px;">Statut : <strong>${status}</strong></p>
                         ${gpsHtml}
                         <p style="font-size: 11px; margin-top: 6px; color: #ccc;">${equipmentText}</p>
                     `;
@@ -282,7 +282,6 @@
             }
         }
 
-        // Transmettre une mission (action propre au PC)
         function sendMission() {
             const unitId = document.getElementById('target-unit').value;
             const title = document.getElementById('mission-title').value;
@@ -314,7 +313,6 @@
             document.getElementById('mission-location').value = '';
         }
 
-        // Ajout manuel d'une note MCI par l'opérateur
         function addLog() {
             const input = document.getElementById('mc-input');
             if (!input.value) return;
@@ -328,7 +326,6 @@
             input.value = '';
         }
 
-        // Affichage fluide et unique de la Main-Courante (MCI)
         db.ref('mains_courantes').limitToLast(50).on('child_added', (snapshot) => {
             const logId = snapshot.key;
             if (document.getElementById(`log-${logId}`)) return;
