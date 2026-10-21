@@ -30,7 +30,7 @@
         .dispatch-box input, .dispatch-box select { padding: 8px; border-radius: 4px; border: none; background: #1a1a24; color: #fff; }
         .dispatch-box button { background: #ff8800; color: #fff; cursor: pointer; font-weight: bold; padding: 8px; border-radius: 4px; border: none; }
 
-        #map-container { flex: 1; height: 100vh; position: relative; background: #e5e3df; }
+        #map-container { flex: 1; height: 100vh; position: relative; background: #1a1a24; }
         #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
 
         #main-courante { width: 380px; min-width: 380px; background: #222230; padding: 15px; border-left: 2px solid #333; display: flex; flex-direction: column; z-index: 10; }
@@ -94,7 +94,6 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // Initialisation sécurisée de Firebase
         const firebaseConfig = {
           apiKey: "AIzaSyCu0BK4h2hhaGV4C46C9y65rBJlnLftq3A",
           authDomain: "rezoplus-police.firebaseapp.com",
@@ -113,16 +112,15 @@
         const DEFAULT_LAT = 48.7563;
         const DEFAULT_LNG = 2.3215;
 
-        // Initialisation garantie de la Carte Leaflet avec serveur de tuiles ultra-fiable
         const map = L.map('map', {
             center: [DEFAULT_LAT, DEFAULT_LNG],
             zoom: 16
         });
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        // Utilisation du serveur OpenStreetMap standard (Open-source et sans clé requise)
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
-            subdomains: 'abcd',
-            attribution: '&copy; OpenStreetMap &copy; CARTO'
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
         window.addEventListener('load', () => {
@@ -159,7 +157,6 @@
             }
         }
 
-        // Écouteur déconnexion
         db.ref('units').on('child_removed', (snapshot) => {
             const unitId = snapshot.key;
             db.ref('mains_courantes').push({
@@ -176,7 +173,6 @@
             }
         });
 
-        // Écouteur principal des Unités
         db.ref('units').on('value', (snapshot) => {
             try {
                 const units = snapshot.val();
@@ -203,7 +199,6 @@
                     let status = unit.status || 'INDISPONIBLE';
                     let badgeColor = getStatusColor(status);
 
-                    // Consignation Connexion
                     if (!knownUnits.has(unitId)) {
                         knownUnits.add(unitId);
                         if (initialLoadDone) {
@@ -215,7 +210,6 @@
                             });
                         }
                     } 
-                    // Consignation Changement de statut (SOS compris)
                     else if (previousStatuses[unitId] && previousStatuses[unitId] !== status) {
                         let logPrefix = "STATUT";
                         if (status === 'SOS_ACTIF') {
@@ -354,7 +348,7 @@
                 statusColor: '#ff8800'
             });
 
-            alert(`Ordre de mission transmitted à ${unitId} !`);
+            alert(`Ordre de mission transmis à ${unitId} !`);
             document.getElementById('mission-title').value = '';
             document.getElementById('mission-location').value = '';
         }
@@ -372,7 +366,6 @@
             input.value = '';
         }
 
-        // Affichage Main-Courante
         db.ref('mains_courantes').limitToLast(50).on('child_added', (snapshot) => {
             const log = snapshot.val();
             const dateObj = new Date(log.timestamp);
