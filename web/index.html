@@ -11,11 +11,12 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
         body { display: flex; height: 100vh; width: 100vw; background: #1a1a24; color: #fff; overflow: hidden; }
         
-        #sidebar { width: 420px; min-width: 420px; background: #222230; padding: 15px; display: flex; flex-direction: column; gap: 15px; border-right: 2px solid #333; overflow-y: auto; z-index: 10; }
+        /* Bande de gauche réduite à 360px pour un meilleur rendu visuel */
+        #sidebar { width: 360px; min-width: 360px; background: #222230; padding: 15px; display: flex; flex-direction: column; gap: 15px; border-right: 2px solid #333; overflow-y: auto; z-index: 10; }
         
-        .header-title { display: flex; align-items: center; gap: 15px; padding-bottom: 5px; }
-        .header-title img { height: 84px; width: auto; object-fit: contain; }
-        .header-title h2 { font-size: 26px; font-weight: bold; color: #fff; margin: 0; line-height: 1.15; text-transform: uppercase; letter-spacing: 0.5px; }
+        .header-title { display: flex; align-items: center; gap: 12px; padding-bottom: 5px; }
+        .header-title img { height: 72px; width: auto; object-fit: contain; }
+        .header-title h2 { font-size: 22px; font-weight: bold; color: #fff; margin: 0; line-height: 1.15; text-transform: uppercase; letter-spacing: 0.5px; }
 
         /* Cartouches unités compacts à gauche */
         .card { padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; border-left: 8px solid #777777; background: #2d2d3f; transition: all 0.2s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.4); }
@@ -28,14 +29,14 @@
         .card.hors_service { border-left-color: #777777 !important; background: #222226 !important; opacity: 0.7; }
 
         .card-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-        .card-unit-title { font-size: 17px; font-weight: bold; color: #fff; }
-        .card-status-badge { font-size: 12px; font-weight: bold; padding: 2px 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.15); color: #fff; }
+        .card-unit-title { font-size: 16px; font-weight: bold; color: #fff; }
+        .card-status-badge { font-size: 11px; font-weight: bold; padding: 2px 6px; border-radius: 4px; background: rgba(255, 255, 255, 0.15); color: #fff; }
 
         .btn-end-mission { background: #ff4444; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-top: 6px; font-weight: bold; width: 100%; }
         .btn-end-mission:hover { background: #cc0000; }
 
         .dispatch-box { background: #262638; padding: 12px; border-radius: 8px; border: 1px solid #444; display: flex; flex-direction: column; gap: 8px; }
-        .dispatch-box input, .dispatch-box select { padding: 8px; border-radius: 4px; border: none; background: #1a1a24; color: #fff; }
+        .dispatch-box input, .dispatch-box select { padding: 8px; border-radius: 4px; border: none; background: #1a1a24; color: #fff; font-size: 13px; }
         .dispatch-box button { background: #ff8800; color: #fff; cursor: pointer; font-weight: bold; padding: 8px; border-radius: 4px; border: none; }
         .dispatch-box button:hover { background: #e67a00; }
 
@@ -105,8 +106,8 @@
     <div id="main-courante">
         <h2>Main-Courante (MCI)</h2>
         <div style="margin: 10px 0; display: flex; gap: 5px;">
-            <input type="text" id="mc-input" placeholder="Nouvel événement..." style="flex: 1; padding: 8px; border-radius: 4px; border: none; background: #1a1a24; color: #fff;">
-            <button onclick="addLog()" style="padding: 8px 12px; background: #0088ff; color: #fff; border: none; border-radius: 4px; cursor: pointer;">Consigner</button>
+            <input type="text" id="mc-input" placeholder="Nouvel événement..." style="flex: 1; padding: 8px; border-radius: 4px; border: none; background: #1a1a24; color: #fff; font-size: 13px;">
+            <button onclick="addLog()" style="padding: 8px 12px; background: #0088ff; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Consigner</button>
         </div>
         <div id="logs-container" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 4px;"></div>
     </div>
@@ -149,7 +150,7 @@
         });
 
         const markers = {};
-        const previousStatuses = {}; // Cache local pour détecter les vrais changements de statut
+        const previousStatuses = {};
 
         function getStatusColor(status) {
             switch(status) {
@@ -190,7 +191,6 @@
             }
         });
 
-        // Gestionnaire global et stable des unités pour alimenter la carte, la sidebar et la main-courante
         db.ref('units').on('value', (snapshot) => {
             try {
                 const units = snapshot.val();
@@ -217,7 +217,6 @@
                     let status = unit.status || 'INDISPONIBLE';
                     let badgeColor = getStatusColor(status);
 
-                    // Détection des changements de statut pour incrémenter la main-courante automatiquement
                     if (previousStatuses[unitId] !== undefined && previousStatuses[unitId] !== status) {
                         let logPrefix = "STATUT";
                         if (status === 'SOS_ACTIF') {
@@ -407,7 +406,6 @@
             input.value = '';
         }
 
-        // Écouteur principal pour alimenter dynamiquement la main-courante
         db.ref('mains_courantes').limitToLast(50).on('child_added', (snapshot) => {
             const logId = snapshot.key;
             if (document.getElementById(`log-${logId}`)) return;
