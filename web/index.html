@@ -11,20 +11,19 @@
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
         body { display: flex; height: 100vh; width: 100vw; background: #1a1a24; color: #fff; overflow: hidden; }
         
-        /* Bande de gauche réduite à 360px pour un meilleur rendu visuel */
         #sidebar { width: 360px; min-width: 360px; background: #222230; padding: 15px; display: flex; flex-direction: column; gap: 15px; border-right: 2px solid #333; overflow-y: auto; z-index: 10; }
         
         .header-title { display: flex; align-items: center; gap: 12px; padding-bottom: 5px; }
         .header-title img { height: 72px; width: auto; object-fit: contain; }
         .header-title h2 { font-size: 22px; font-weight: bold; color: #fff; margin: 0; line-height: 1.15; text-transform: uppercase; letter-spacing: 0.5px; }
 
-        /* Cartouches unités compacts à gauche */
         .card { padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; border-left: 8px solid #777777; background: #2d2d3f; transition: all 0.2s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.4); }
         .card.sos { border-left-color: #ff2222 !important; background: #4a1515 !important; border: 1px solid #ff2222; animation: blink 1s infinite; }
         .card.intervention { border-left-color: #ff8800 !important; background: #3d2612 !important; }
         .card.controle_pr { border-left-color: #009688 !important; background: #00332c !important; }
         .card.patrouille { border-left-color: #22bb33 !important; background: #123018 !important; }
         .card.transport { border-left-color: #00a8ff !important; background: #12223b !important; }
+        .card.escale { border-left-color: #e91e63 !important; background: #381222 !important; }
         .card.retour { border-left-color: #9c27b0 !important; background: #2b1638 !important; }
         .card.hors_service { border-left-color: #777777 !important; background: #222226 !important; opacity: 0.7; }
 
@@ -158,7 +157,8 @@
                 case 'EN_INTERVENTION': return '#ff8800';
                 case 'CONTROLE_PR': return '#009688';
                 case 'EN_PATROUILLE': return '#22bb33';
-                case 'TRANSPORT': return '#00a8ff';
+                case 'TRANSPORT_ESCORTE': return '#00a8ff';
+                case 'ESCALE_TECHNIQUE': return '#e91e63';
                 case 'RETOUR_POSTE': return '#9c27b0';
                 default: return '#777777';
             }
@@ -170,7 +170,8 @@
                 case 'EN_INTERVENTION': return 'intervention';
                 case 'CONTROLE_PR': return 'controle_pr';
                 case 'EN_PATROUILLE': return 'patrouille';
-                case 'TRANSPORT': return 'transport';
+                case 'TRANSPORT_ESCORTE': return 'transport';
+                case 'ESCALE_TECHNIQUE': return 'escale';
                 case 'RETOUR_POSTE': return 'retour';
                 default: return 'hors_service';
             }
