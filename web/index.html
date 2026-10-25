@@ -19,19 +19,23 @@
 
         .card { padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; border-left: 8px solid #777777; background: #2d2d3f; transition: all 0.2s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.4); }
         .card.sos { border-left-color: #ff2222 !important; background: #4a1515 !important; border: 1px solid #ff2222; animation: blink 1s infinite; }
-        .card.intervention { border-left-color: #ff8800 !important; background: #3d2612 !important; }
-        .card.controle_pr { border-left-color: #009688 !important; background: #00332c !important; }
-        .card.patrouille { border-left-color: #22bb33 !important; background: #123018 !important; }
-        .card.transport { border-left-color: #00a8ff !important; background: #12223b !important; }
-        .card.escale { border-left-color: #e91e63 !important; background: #381222 !important; }
-        .card.retour { border-left-color: #9c27b0 !important; background: #2b1638 !important; }
-        .card.hors_service { border-left-color: #777777 !important; background: #222226 !important; opacity: 0.7; }
+        .card.EN_INTERVENTION { border-left-color: #ff8800 !important; background: #3d2612 !important; }
+        .card.CONTROLE_PR { border-left-color: #009688 !important; background: #00332c !important; }
+        .card.EN_PATROUILLE { border-left-color: #22bb33 !important; background: #123018 !important; }
+        .card.TRANSPORT_ESCORTE { border-left-color: #00a8ff !important; background: #12223b !important; }
+        .card.ESCALE_TECHNIQUE { border-left-color: #e91e63 !important; background: #381222 !important; }
+        .card.RETOUR_POSTE { border-left-color: #9c27b0 !important; background: #2b1638 !important; }
+        .card.INDISPONIBLE { border-left-color: #777777 !important; background: #222226 !important; opacity: 0.7; }
 
         .card-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
         .card-unit-title { font-size: 16px; font-weight: bold; color: #fff; }
         .card-status-badge { font-size: 11px; font-weight: bold; padding: 2px 6px; border-radius: 4px; background: rgba(255, 255, 255, 0.15); color: #fff; }
 
-        .btn-end-mission { background: #ff4444; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-top: 6px; font-weight: bold; width: 100%; }
+        .btn-action-row { display: flex; gap: 6px; margin-top: 6px; }
+        .btn-center-map { background: #0088ff; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; flex: 1; }
+        .btn-center-map:hover { background: #0066cc; }
+
+        .btn-end-mission { background: #ff4444; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; flex: 1; }
         .btn-end-mission:hover { background: #cc0000; }
 
         .dispatch-box { background: #262638; padding: 12px; border-radius: 8px; border: 1px solid #444; display: flex; flex-direction: column; gap: 8px; }
@@ -167,13 +171,22 @@
         function getStatusClass(status) {
             switch(status) {
                 case 'SOS_ACTIF': return 'sos';
-                case 'EN_INTERVENTION': return 'intervention';
-                case 'CONTROLE_PR': return 'controle_pr';
-                case 'EN_PATROUILLE': return 'patrouille';
-                case 'TRANSPORT_ESCORTE': return 'transport';
-                case 'ESCALE_TECHNIQUE': return 'escale';
-                case 'RETOUR_POSTE': return 'retour';
-                default: return 'hors_service';
+                case 'EN_INTERVENTION': return 'EN_INTERVENTION';
+                case 'CONTROLE_PR': return 'CONTROLE_PR';
+                case 'EN_PATROUILLE': return 'EN_PATROUILLE';
+                case 'TRANSPORT_ESCORTE': return 'TRANSPORT_ESCORTE';
+                case 'ESCALE_TECHNIQUE': return 'ESCALE_TECHNIQUE';
+                case 'RETOUR_POSTE': return 'RETOUR_POSTE';
+                default: return 'INDISPONIBLE';
+            }
+        }
+
+        // Fonction pour centrer la carte sur une unité spécifique
+        function centerOnUnit(unitId) {
+            if (markers[unitId]) {
+                const latLng = markers[unitId].getLatLng();
+                map.setView(latLng, 17, { animate: true });
+                markers[unitId].openPopup();
             }
         }
 
@@ -297,17 +310,11 @@
                         }
                     }
 
-                    let missionHtml = '';
+                    let actionButtonsHtml = `<button class="btn-center-map" onclick="centerOnUnit('${unitId}')">🎯 Centrer</button>`;
                     if (status === 'EN_INTERVENTION' && unit.active_mission) {
                         const mTitle = unit.active_mission.title || unit.active_mission.titre || 'Intervention en cours';
                         const mLoc = unit.active_mission.location || unit.active_mission.adresse || 'Lieu non précisé';
-                        missionHtml = `
-                            <div style="margin-top: 6px; padding: 6px; background: rgba(0,0,0,0.3); border-radius: 4px; font-size: 11px; border-left: 3px solid #ff8800;">
-                                🎯 <strong>Mission :</strong> ${mTitle}<br>
-                                📍 <strong>Lieu :</strong> ${mLoc}
-                            </div>
-                            <button class="btn-end-mission" onclick="endMission('${unitId}')">Clôturer l'intervention</button>
-                        `;
+                        actionButtonsHtml += `<button class="btn-end-mission" onclick="endMission('${unitId}')">Clôturer</button>`;
                     }
 
                     const cardClass = getStatusClass(status);
@@ -322,7 +329,9 @@
                         <p style="font-size: 11px; color: #ddd; margin-top: 4px; line-height: 1.3;">
                             <strong>Embarqué :</strong> ${equipmentText}
                         </p>
-                        ${missionHtml}
+                        <div class="btn-action-row">
+                            ${actionButtonsHtml}
+                        </div>
                     `;
                     unitsContainer.appendChild(cardDiv);
                 });
