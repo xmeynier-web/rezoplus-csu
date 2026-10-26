@@ -20,7 +20,8 @@
         .card { padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; border-left: 8px solid #777777; background: #2d2d3f; transition: all 0.2s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.4); }
         .card.sos { border-left-color: #ff2222 !important; background: #4a1515 !important; border: 1px solid #ff2222; animation: blink 1s infinite; }
         .card.EN_INTERVENTION { border-left-color: #ff8800 !important; background: #3d2612 !important; }
-        .card.CONTROLE_PR { border-left-color: #009688 !important; background: #00332c !important; }
+        .card.CONTROLE_PR { border-left-color: #f1c40f !important; background: #332e00 !important; }
+        .card.ATTENTE_FOURRIERE { border-left-color: #009688 !important; background: #00332c !important; }
         .card.EN_PATROUILLE { border-left-color: #22bb33 !important; background: #123018 !important; }
         .card.TRANSPORT_ESCORTE { border-left-color: #00a8ff !important; background: #12223b !important; }
         .card.ESCALE_TECHNIQUE { border-left-color: #e91e63 !important; background: #381222 !important; }
@@ -145,7 +146,7 @@
 
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
         window.addEventListener('load', () => {
@@ -159,7 +160,8 @@
             switch(status) {
                 case 'SOS_ACTIF': return '#ff2222';
                 case 'EN_INTERVENTION': return '#ff8800';
-                case 'CONTROLE_PR': return '#009688';
+                case 'CONTROLE_PR': return '#f1c40f'; // Jaune ambré distinctif
+                case 'ATTENTE_FOURRIERE': return '#009688'; // Ancien Teal de Contrôle PR
                 case 'EN_PATROUILLE': return '#22bb33';
                 case 'TRANSPORT_ESCORTE': return '#00a8ff';
                 case 'ESCALE_TECHNIQUE': return '#e91e63';
@@ -173,6 +175,7 @@
                 case 'SOS_ACTIF': return 'sos';
                 case 'EN_INTERVENTION': return 'EN_INTERVENTION';
                 case 'CONTROLE_PR': return 'CONTROLE_PR';
+                case 'ATTENTE_FOURRIERE': return 'ATTENTE_FOURRIERE';
                 case 'EN_PATROUILLE': return 'EN_PATROUILLE';
                 case 'TRANSPORT_ESCORTE': return 'TRANSPORT_ESCORTE';
                 case 'ESCALE_TECHNIQUE': return 'ESCALE_TECHNIQUE';
@@ -181,7 +184,6 @@
             }
         }
 
-        // Fonction pour centrer la carte sur une unité spécifique
         function centerOnUnit(unitId) {
             if (markers[unitId]) {
                 const latLng = markers[unitId].getLatLng();
@@ -312,8 +314,6 @@
 
                     let actionButtonsHtml = `<button class="btn-center-map" onclick="centerOnUnit('${unitId}')">🎯 Centrer</button>`;
                     if (status === 'EN_INTERVENTION' && unit.active_mission) {
-                        const mTitle = unit.active_mission.title || unit.active_mission.titre || 'Intervention en cours';
-                        const mLoc = unit.active_mission.location || unit.active_mission.adresse || 'Lieu non précisé';
                         actionButtonsHtml += `<button class="btn-end-mission" onclick="endMission('${unitId}')">Clôturer</button>`;
                     }
 
