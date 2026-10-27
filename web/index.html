@@ -160,8 +160,8 @@
             switch(status) {
                 case 'SOS_ACTIF': return '#ff2222';
                 case 'EN_INTERVENTION': return '#ff8800';
-                case 'CONTROLE_PR': return '#f1c40f'; // Jaune ambré distinctif
-                case 'ATTENTE_FOURRIERE': return '#009688'; // Ancien Teal de Contrôle PR
+                case 'CONTROLE_PR': return '#f1c40f';
+                case 'ATTENTE_FOURRIERE': return '#009688';
                 case 'EN_PATROUILLE': return '#22bb33';
                 case 'TRANSPORT_ESCORTE': return '#00a8ff';
                 case 'ESCALE_TECHNIQUE': return '#e91e63';
@@ -212,7 +212,7 @@
                 const units = snapshot.val();
                 const unitsContainer = document.getElementById('units-container');
                 const targetSelect = document.getElementById('target-unit');
-                
+
                 const currentSelectedTarget = targetSelect.value;
 
                 unitsContainer.innerHTML = '';
@@ -225,12 +225,15 @@
 
                 Object.keys(units).forEach((unitId) => {
                     const unit = units[unitId];
-                    
+
+                    let status = unit.status || 'INDISPONIBLE';
+                    const missionStatus = unit.mission_status || (unit.active_mission ? 'EN_COURS' : 'AUCUN');
+                    const missionFeedback = unit.mission_feedback || '';
+
                     const opt1 = document.createElement('option');
                     opt1.value = unitId; opt1.textContent = unitId;
                     targetSelect.appendChild(opt1);
 
-                    let status = unit.status || 'INDISPONIBLE';
                     let badgeColor = getStatusColor(status);
 
                     if (previousStatuses[unitId] !== undefined && previousStatuses[unitId] !== status) {
@@ -238,7 +241,7 @@
                         if (status === 'SOS_ACTIF') {
                             logPrefix = "🚨 DÉCLENCHEMENT SOS 🚨";
                         }
-                        
+
                         db.ref('mains_courantes').push({
                             message: `${logPrefix} -> Indicatif : ${unitId} | Statut : ${status}`,
                             timestamp: Date.now(),
@@ -279,10 +282,10 @@
                     if (markers[unitId]) {
                         markers[unitId].setLatLng([lat, lng]);
                         markers[unitId].setIcon(customIcon);
-                        markers[unitId].setPopupContent(`<b>Unité : ${unitId}</b><br>Statut: ${status}`);
+                        markers[unitId].setPopupContent(`<b>Unité : ${unitId}</b><br>Statut: ${status}<br>Mission: ${missionStatus}`);
                     } else {
                         const marker = L.marker([lat, lng], { icon: customIcon, draggable: true }).addTo(map)
-                            .bindPopup(`<b>Unité : ${unitId}</b><br>Glissez l'épingle pour la replacer.`);
+                            .bindPopup(`<b>Unité : ${unitId}</b><br>Statut: ${status}<br>Mission: ${missionStatus}`);
 
                         marker.on('dragend', function(event) {
                             const newPos = event.target.getLatLng();
@@ -329,6 +332,13 @@
                         <p style="font-size: 11px; color: #ddd; margin-top: 4px; line-height: 1.3;">
                             <strong>Embarqué :</strong> ${equipmentText}
                         </p>
+                        <p style="font-size: 11px; color: #ddd; margin-top: 4px; line-height: 1.3;">
+                            <strong>Mission :</strong> ${missionStatus}
+                        </p>
+                        ${missionFeedback ? `
+                        <p style="font-size: 11px; color: #ddd; margin-top: 2px; line-height: 1.3;">
+                            <strong>Retour :</strong> ${missionFeedback}
+                        </p>` : ''}
                         <div class="btn-action-row">
                             ${actionButtonsHtml}
                         </div>
@@ -360,6 +370,8 @@
 
             const updates = {};
             updates[`units/${unitId}/status`] = "EN_INTERVENTION";
+            updates[`units/${unitId}/mission_status`] = "EN_COURS";
+            updates[`units/${unitId}/mission_feedback`] = `Mission transmise par le PC : ${title}`;
             updates[`units/${unitId}/active_mission`] = {
                 title: title,
                 titre: title,
@@ -389,6 +401,8 @@
             const nowTimestamp = Date.now();
             const updates = {};
             updates[`units/${unitId}/status`] = "EN_PATROUILLE";
+            updates[`units/${unitId}/mission_status`] = "TERMINEE";
+            updates[`units/${unitId}/mission_feedback`] = "Mission clôturée par le PC";
             updates[`units/${unitId}/active_mission`] = null;
 
             db.ref().update(updates).then(() => {
