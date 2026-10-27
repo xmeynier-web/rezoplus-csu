@@ -10,6 +10,7 @@
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
       crossorigin=""
     />
+
     <style>
       :root {
         --bg: #0d1117;
@@ -18,10 +19,12 @@
         --text: #e6edf3;
         --muted: #8b949e;
         --line: rgba(255,255,255,0.08);
-        --accent: #2f81f7;
       }
 
-      * { box-sizing: border-box; }
+      * {
+        box-sizing: border-box;
+      }
+
       html, body {
         margin: 0;
         height: 100%;
@@ -30,7 +33,9 @@
         font-family: Arial, sans-serif;
       }
 
-      body { overflow: hidden; }
+      body {
+        overflow: hidden;
+      }
 
       .app {
         display: flex;
@@ -184,18 +189,21 @@
         .app {
           flex-direction: column;
         }
+
         .sidebar {
           width: 100%;
           max-height: 48vh;
           border-right: none;
           border-bottom: 1px solid var(--line);
         }
+
         .map-panel {
           height: 52vh;
         }
       }
     </style>
   </head>
+
   <body>
     <div class="app">
       <aside class="sidebar">
@@ -220,27 +228,32 @@
       </main>
     </div>
 
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-    <script>
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+      import {
+        getDatabase,
+        ref,
+        onValue
+      } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
       const firebaseConfig = {
-        apiKey: "YOUR_API_KEY",
+        apiKey: "AIzaSyCu0BK4h2hhaGV4C46C9y65rBJlnLftq3A",
         authDomain: "rezoplus-police.firebaseapp.com",
         databaseURL: "https://rezoplus-police-default-rtdb.europe-west1.firebasedatabase.app",
         projectId: "rezoplus-police",
-        storageBucket: "rezoplus-police.appspot.com",
+        storageBucket: "rezoplus-police.firebasestorage.app",
         messagingSenderId: "561209004165",
-        appId: "YOUR_APP_ID"
+        appId: "1:561209004165:web:4c19c7b505bf7ad7df19ec"
       };
 
-      firebase.initializeApp(firebaseConfig);
-      const db = firebase.database();
+      const app = initializeApp(firebaseConfig);
+      const db = getDatabase(app);
 
-      const unitsRef = db.ref("units");
-      const mainCouranteRef = db.ref("mains_courantes");
+      const unitsRef = ref(db, "units");
+      const mainCouranteRef = ref(db, "mains_courantes");
 
       const map = L.map("map").setView([48.755578, 2.321367], 12);
+
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: "&copy; OpenStreetMap contributors"
       }).addTo(map);
@@ -438,12 +451,12 @@
           });
       }
 
-      unitsRef.on("value", (snapshot) => {
+      onValue(unitsRef, (snapshot) => {
         const units = snapshot.val() || {};
         refreshUnits(units);
       });
 
-      mainCouranteRef.on("value", (snapshot) => {
+      onValue(mainCouranteRef, (snapshot) => {
         const items = snapshot.val() || {};
         renderMainCourante(items);
       });
